@@ -1,203 +1,192 @@
 <div align="center">
 
-<img src="./static/image/MiroFish_logo_compressed.jpeg" alt="MiroFish Logo" width="75%"/>
+<img src="./frontend/public/lemon_fish_500.png" alt="LemonFish Logo" width="200"/>
 
-<a href="https://trendshift.io/repositories/16144" target="_blank"><img src="https://trendshift.io/api/badge/repositories/16144" alt="666ghj%2FMiroFish | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+# LemonFish
 
-简洁通用的群体智能引擎，预测万物
-</br>
-<em>A Simple and Universal Swarm Intelligence Engine, Predicting Anything</em>
+**Codename LemonFish** | A hardened fork of [MiroFish](https://github.com/666ghj/MiroFish)
 
-<a href="https://www.shanda.com/" target="_blank"><img src="./static/image/shanda_logo.png" alt="666ghj%2MiroFish | Shanda" height="40"/></a>
+*Multi-agent prediction engine with resilience, internationalisation, and slim deployment*
 
-[![GitHub Stars](https://img.shields.io/github/stars/666ghj/MiroFish?style=flat-square&color=DAA520)](https://github.com/666ghj/MiroFish/stargazers)
-[![GitHub Watchers](https://img.shields.io/github/watchers/666ghj/MiroFish?style=flat-square)](https://github.com/666ghj/MiroFish/watchers)
-[![GitHub Forks](https://img.shields.io/github/forks/666ghj/MiroFish?style=flat-square)](https://github.com/666ghj/MiroFish/network)
-[![Docker](https://img.shields.io/badge/Docker-Build-2496ED?style=flat-square&logo=docker&logoColor=white)](https://hub.docker.com/)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/666ghj/MiroFish)
+[![GitHub Stars](https://img.shields.io/github/stars/Lvigentini/MiroFish?style=flat-square&color=DAA520)](https://github.com/Lvigentini/MiroFish/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/Lvigentini/MiroFish?style=flat-square)](https://github.com/Lvigentini/MiroFish/network)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](LICENSE)
 
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white)](http://discord.gg/ePf5aPaHnA)
-[![X](https://img.shields.io/badge/X-Follow-000000?style=flat-square&logo=x&logoColor=white)](https://x.com/mirofish_ai)
-[![Instagram](https://img.shields.io/badge/Instagram-Follow-E4405F?style=flat-square&logo=instagram&logoColor=white)](https://www.instagram.com/mirofish_ai/)
-
-[English](./README.md) | [中文文档](./README-ZH.md)
+[English](./README.md) | [Architecture Docs](./docs/ARCHITECTURE.md) | [Feature Roadmap](./docs/new_features_planning.md)
 
 </div>
 
-## ⚡ Overview
+---
 
-**MiroFish** is a next-generation AI prediction engine powered by multi-agent technology. By extracting seed information from the real world (such as breaking news, policy drafts, or financial signals), it automatically constructs a high-fidelity parallel digital world. Within this space, thousands of intelligent agents with independent personalities, long-term memory, and behavioral logic freely interact and undergo social evolution. You can inject variables dynamically from a "God's-eye view" to precisely deduce future trajectories — **rehearse the future in a digital sandbox, and win decisions after countless simulations**.
+## What's different from MiroFish?
 
-> You only need to: Upload seed materials (data analysis reports or interesting novel stories) and describe your prediction requirements in natural language</br>
-> MiroFish will return: A detailed prediction report and a deeply interactive high-fidelity digital world
+LemonFish takes the MiroFish multi-agent simulation engine and makes it **production-ready, resilient, and accessible**:
 
-### Our Vision
+| Feature | MiroFish | LemonFish |
+|---------|----------|-----------|
+| LLM failure handling | None (single call, hard crash) | Exponential backoff + fallback model chain |
+| Free-tier support | Requires paid API (DashScope) | OpenRouter free models with 4-model fallback |
+| Language support | Chinese UI + hardcoded backend strings | Full i18n (Chinese, English, Spanish) |
+| Docker image | 14GB (full Debian + CUDA torch) | ~2-3GB slim (CPU-only torch, multi-stage build) |
+| Setup experience | Manual .env editing | Interactive setup wizard (`./setup.sh`) |
+| Network access | localhost only | Remote-accessible out of the box |
+| Documentation | Chinese README | Full architecture deep-dive + feature planning |
+| Multi-model agents | Single LLM for all agents | Planned: randomised model assignment per persona |
 
-MiroFish is dedicated to creating a swarm intelligence mirror that maps reality. By capturing the collective emergence triggered by individual interactions, we break through the limitations of traditional prediction:
+---
 
-- **At the Macro Level**: We are a rehearsal laboratory for decision-makers, allowing policies and public relations to be tested at zero risk
-- **At the Micro Level**: We are a creative sandbox for individual users — whether deducing novel endings or exploring imaginative scenarios, everything can be fun, playful, and accessible
-
-From serious predictions to playful simulations, we let every "what if" see its outcome, making it possible to predict anything.
-
-## 🌐 Live Demo
-
-Welcome to visit our online demo environment and experience a prediction simulation on trending public opinion events we've prepared for you: [mirofish-live-demo](https://666ghj.github.io/mirofish-demo/)
-
-## 📸 Screenshots
-
-<div align="center">
-<table>
-<tr>
-<td><img src="./static/image/Screenshot/运行截图1.png" alt="Screenshot 1" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图2.png" alt="Screenshot 2" width="100%"/></td>
-</tr>
-<tr>
-<td><img src="./static/image/Screenshot/运行截图3.png" alt="Screenshot 3" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图4.png" alt="Screenshot 4" width="100%"/></td>
-</tr>
-<tr>
-<td><img src="./static/image/Screenshot/运行截图5.png" alt="Screenshot 5" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图6.png" alt="Screenshot 6" width="100%"/></td>
-</tr>
-</table>
-</div>
-
-## 🎬 Demo Videos
-
-### 1. Wuhan University Public Opinion Simulation + MiroFish Project Introduction
-
-<div align="center">
-<a href="https://www.bilibili.com/video/BV1VYBsBHEMY/" target="_blank"><img src="./static/image/武大模拟演示封面.png" alt="MiroFish Demo Video" width="75%"/></a>
-
-Click the image to watch the complete demo video for prediction using BettaFish-generated "Wuhan University Public Opinion Report"
-</div>
-
-### 2. Dream of the Red Chamber Lost Ending Simulation
-
-<div align="center">
-<a href="https://www.bilibili.com/video/BV1cPk3BBExq" target="_blank"><img src="./static/image/红楼梦模拟推演封面.jpg" alt="MiroFish Demo Video" width="75%"/></a>
-
-Click the image to watch MiroFish's deep prediction of the lost ending based on hundreds of thousands of words from the first 80 chapters of "Dream of the Red Chamber"
-</div>
-
-> **Financial Prediction**, **Political News Prediction** and more examples coming soon...
-
-## 🔄 Workflow
-
-1. **Graph Building**: Seed extraction & Individual/collective memory injection & GraphRAG construction
-2. **Environment Setup**: Entity relationship extraction & Persona generation & Agent configuration injection
-3. **Simulation**: Dual-platform parallel simulation & Auto-parse prediction requirements & Dynamic temporal memory updates
-4. **Report Generation**: ReportAgent with rich toolset for deep interaction with post-simulation environment
-5. **Deep Interaction**: Chat with any agent in the simulated world & Interact with ReportAgent
-
-## 🚀 Quick Start
-
-### Option 1: Source Code Deployment (Recommended)
-
-#### Prerequisites
-
-| Tool | Version | Description | Check Installation |
-|------|---------|-------------|-------------------|
-| **Node.js** | 18+ | Frontend runtime, includes npm | `node -v` |
-| **Python** | ≥3.11, ≤3.12 | Backend runtime | `python --version` |
-| **uv** | Latest | Python package manager | `uv --version` |
-
-#### 1. Configure Environment Variables
+## Quick Start
 
 ```bash
-# Copy the example configuration file
-cp .env.example .env
-
-# Edit the .env file and fill in the required API keys
+git clone https://github.com/Lvigentini/MiroFish.git lemonfish
+cd lemonfish
+./setup.sh
 ```
 
-**Required Environment Variables:**
+The setup wizard will:
+1. Ask you to pick an LLM provider (OpenRouter free, OpenAI, Gemini, DeepSeek, Claude, Grok, Qwen, Kimi)
+2. Ask for your API key
+3. Ask for a Zep Cloud key (free tier: [app.getzep.com](https://app.getzep.com/))
+4. Build an optimised Docker image and launch
 
+Open **http://localhost:3000** when done.
+
+### Supported LLM Providers
+
+Any OpenAI SDK-compatible API works. Tested with:
+
+| Provider | Free tier? | Notes |
+|----------|-----------|-------|
+| **OpenRouter** | Yes (multiple free models) | Recommended for getting started |
+| **Google Gemini** | Yes (generous) | Via AI Studio |
+| **OpenAI** | No | gpt-4o-mini recommended |
+| **DeepSeek** | No | Cheapest paid option |
+| **Anthropic Claude** | No | May not support JSON mode |
+| **Grok (xAI)** | No | May not support JSON mode |
+| **Alibaba Qwen** | Limited | Original MiroFish default |
+| **Kimi / Moonshot** | Limited | May not support all features |
+
+---
+
+## How It Works
+
+LemonFish predicts outcomes by simulating social dynamics. Upload documents about a topic, describe what you want to predict, and the engine builds a parallel digital world populated with AI agents who discuss, argue, and react — then produces a prediction report.
+
+### The 5-Step Pipeline
+
+```
+  Documents          Knowledge          Agent               Social Media        Prediction
+  (PDF/MD/TXT)  -->  Graph         -->  Personas       -->  Simulation     -->  Report
+                     (Zep Cloud)        (LLM-generated)     (Twitter+Reddit)    (ReportAgent)
+```
+
+**Step 1 - Graph Building**: Your documents are chunked and ingested into a Zep Cloud knowledge graph. An LLM designs an ontology (entity types, relationships) specific to your topic. Zep extracts entities and builds the graph.
+
+**Step 2 - Environment Setup**: Each entity from the graph becomes an AI agent with a rich persona — biography, personality (MBTI), profession, interests, demographics. All generated by LLM and grounded in the source material.
+
+**Step 3 - Simulation**: Agents are placed on simulated Twitter and Reddit. They post, comment, like, follow, and argue — driven by their personas and the LLM. Each round advances simulated time. Dynamic memory updates as agents form opinions and react to each other.
+
+**Step 4 - Report Generation**: A ReportAgent with tool access (graph search, agent interviews, simulation data analysis) produces a structured prediction report with confidence scores.
+
+**Step 5 - Deep Interaction**: Chat with any agent in the simulated world. Ask the ReportAgent follow-up questions. Run additional interviews.
+
+For a full technical walkthrough, see [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
+---
+
+## Resilience Features
+
+LemonFish is designed to survive the realities of free-tier LLM APIs:
+
+**LLM Retry with Backoff**: Every LLM call retries up to 3 times with exponential backoff (2s, 4s, 8s). Catches 429, 500-504, timeouts, and connection errors.
+
+**Fallback Model Chain**: When the primary model is exhausted, automatically cycles through fallback models. Default chain for OpenRouter:
+```
+gemma-4-31b → llama-3.3-70b → hermes-3-405b → nemotron-120b → openrouter/free
+```
+
+**Per-Batch Graph Building**: If batch 47 of 100 fails during graph construction, batches 1-46 are preserved. Each batch retries independently.
+
+**Configurable via .env**:
 ```env
-# LLM API Configuration (supports any LLM API with OpenAI SDK format)
-# Recommended: Alibaba Qwen-plus model via Bailian Platform: https://bailian.console.aliyun.com/
-# High consumption, try simulations with fewer than 40 rounds first
-LLM_API_KEY=your_api_key
-LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-LLM_MODEL_NAME=qwen-plus
-
-# Zep Cloud Configuration
-# Free monthly quota is sufficient for simple usage: https://app.getzep.com/
-ZEP_API_KEY=your_zep_api_key
+LLM_FALLBACK_MODELS=model1:free,model2:free,model3:free
+LLM_MAX_RETRIES=3
+LLM_RETRY_BASE_DELAY=2.0
 ```
 
-#### 2. Install Dependencies
+---
 
-```bash
-# One-click installation of all dependencies (root + frontend + backend)
-npm run setup:all
+## Internationalisation
+
+Backend and frontend fully support language switching. Currently shipping:
+- Chinese (original)
+- English
+- Spanish
+
+The backend uses a `t('key.path')` function with JSON translation files in `locales/`. Adding a new language = adding one JSON file.
+
+---
+
+## Slim Docker Image
+
+The original MiroFish Docker image is **14GB** due to full CUDA PyTorch + Debian. LemonFish ships a multi-stage slim build:
+
+- **Base**: `python:3.11-slim` (Debian Bookworm minimal)
+- **PyTorch**: CPU-only (~200MB vs 6.1GB with CUDA)
+- **Frontend**: Pre-built static files served via nginx (no Node.js runtime in production)
+- **No CUDA/nvidia/triton**: These GPU libraries are never used (all inference is via remote API)
+
+---
+
+## Roadmap
+
+### Multi-Model Persona Assignment
+
+The biggest planned feature: randomise LLM assignment across agents to break monoculture artifacts. A simulation with 200 agents on 4 different LLMs produces more authentic variation than 200 agents all running on the same model.
+
+Design principles:
+- **Random assignment**, not role-based — no assumptions about model capability
+- **Model lock per agent** — once assigned, never changes mid-simulation
+- **Skip turn, don't swap** — if an agent's model is rate-limited, the agent goes silent rather than speaking with a different cognitive architecture
+
+See [docs/new_features_planning.md](./docs/new_features_planning.md) for full design.
+
+---
+
+## Project Structure
+
+```
+lemonfish/
+├── setup.sh                  # Setup wizard (creates .env + launches Docker)
+├── docker-compose.slim.yml   # Slim production compose
+├── Dockerfile.slim           # Multi-stage optimised build
+├── docker-compose.yml        # Dev mode (full image)
+├── Dockerfile                # Original build
+├── nginx.conf                # Reverse proxy config
+├── .env                      # Configuration (created by setup.sh)
+├── locales/                  # Translation files (zh, en, es)
+├── docs/
+│   ├── ARCHITECTURE.md       # Full technical deep-dive
+│   └── new_features_planning.md
+├── frontend/                 # Vue 3 + Vite
+└── backend/                  # Flask + Python 3.11
+    ├── app/
+    │   ├── api/              # REST endpoints
+    │   ├── services/         # Business logic
+    │   └── utils/            # LLM client, i18n, retry, file parsing
+    └── scripts/              # OASIS simulation runners
 ```
 
-Or install step by step:
+---
 
-```bash
-# Install Node dependencies (root + frontend)
-npm run setup
+## Acknowledgements
 
-# Install Python dependencies (backend, auto-creates virtual environment)
-npm run setup:backend
-```
+LemonFish is a fork of **[MiroFish](https://github.com/666ghj/MiroFish)** by BaiFu (666ghj), which received strategic support and incubation from Shanda Group.
 
-#### 3. Start Services
+The simulation engine is powered by **[OASIS](https://github.com/camel-ai/oasis)** (Open Agent Social Interaction Simulations) from the CAMEL-AI team.
 
-```bash
-# Start both frontend and backend (run from project root)
-npm run dev
-```
+---
 
-**Service URLs:**
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:5001`
+## License
 
-**Start Individually:**
-
-```bash
-npm run backend   # Start backend only
-npm run frontend  # Start frontend only
-```
-
-### Option 2: Docker Deployment
-
-```bash
-# 1. Configure environment variables (same as source deployment)
-cp .env.example .env
-
-# 2. Pull image and start
-docker compose up -d
-```
-
-Reads `.env` from root directory by default, maps ports `3000 (frontend) / 5001 (backend)`
-
-> Mirror address for faster pulling is provided as comments in `docker-compose.yml`, replace if needed.
-
-## 📬 Join the Conversation
-
-<div align="center">
-<img src="./static/image/QQ群.png" alt="QQ Group" width="60%"/>
-</div>
-
-&nbsp;
-
-The MiroFish team is recruiting full-time/internship positions. If you're interested in multi-agent simulation and LLM applications, feel free to send your resume to: **mirofish@shanda.com**
-
-## 📄 Acknowledgments
-
-**MiroFish has received strategic support and incubation from Shanda Group!**
-
-MiroFish's simulation engine is powered by **[OASIS (Open Agent Social Interaction Simulations)](https://github.com/camel-ai/oasis)**, We sincerely thank the CAMEL-AI team for their open-source contributions!
-
-## 📈 Project Statistics
-
-<a href="https://www.star-history.com/#666ghj/MiroFish&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&legend=top-left" />
- </picture>
-</a>
+AGPL-3.0 — same as the original MiroFish project.

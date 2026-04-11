@@ -1,0 +1,82 @@
+# ============================================================
+# MiroFish Slim Image
+# Target: smallest viable image for ML-capable simulation
+# Base: python:3.11-slim (Debian Bookworm) ~150MB
+# Strategy: multi-stage build, CPU-only torch, nginx reverse proxy
+# Expected size: ~2-3GB (vs 14GB original)
+# ============================================================
+
+# --- Stage 1: Build frontend ---
+FROM node:20-slim AS frontend-builder
+WORKDIR /build
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+# Locales are referenced via @locales alias (../locales from frontend/)
+COPY locales/ /locales/
+# Build with empty base URL so API calls go to same origin
+ENV VITE_API_BASE_URL=""
+RUN npm run build
+
+# --- Stage 2: Install Python deps with CPU-only torch ---
+FROM python:3.11-slim AS python-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+WORKDIR /app/backend
+COPY backend/pyproject.toml backend/uv.lock ./
+
+# Install deps from lockfile
+RUN uv sync --frozen
+
+# Replace CUDA torch with CPU-only version (saves ~5.8GB)
+RUN uv pip install --reinstall \
+    torch --index-url https://download.pytorch.org/whl/cpu \
+    2>/dev/null; \
+    # Clean up nvidia/triton GPU packages
+    rm -rf .venv/lib/python3.11/site-packages/nvidia* \
+           .venv/lib/python3.11/site-packages/triton* \
+           .venv/lib/python3.11/site-packages/torch/lib/libnccl* \
+           .venv/lib/python3.11/site-packages/torch/lib/libcudnn* \
+    # Clean up __pycache__ and .pyc to save space
+    && find .venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; \
+    find .venv -name "*.pyc" -delete 2>/dev/null; true
+
+# --- Stage 3: Final runtime image ---
+FROM python:3.11-slim AS runtime
+
+# Install nginx (tiny, perfect for reverse proxying)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+WORKDIR /app
+
+# Copy Python venv from builder (CPU-only, no CUDA bloat)
+COPY --from=python-builder /app/backend/.venv /app/backend/.venv
+
+# Copy backend source
+COPY backend/ /app/backend/
+
+# Copy built frontend static files
+COPY --from=frontend-builder /build/dist /app/frontend/dist
+
+# Copy locales (needed by backend)
+COPY locales/ /app/locales/
+
+# Nginx config: serve frontend + proxy /api to Flask backend
+COPY nginx.conf /etc/nginx/sites-available/default
+
+# Copy startup script
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+EXPOSE 3000 5001
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
