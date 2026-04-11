@@ -27,10 +27,11 @@ def main():
     # 验证配置
     errors = Config.validate()
     if errors:
-        print("配置错误:")
+        from app.utils.locale import t
+        print(t('backend.configError'))
         for err in errors:
             print(f"  - {err}")
-        print("\n请检查 .env 文件中的配置")
+        print(f"\n{t('backend.checkEnvConfig')}")
         sys.exit(1)
     
     # 创建应用

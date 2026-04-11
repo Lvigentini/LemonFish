@@ -661,5 +661,31 @@
     "llmSelectAgentFailed": "LLM agent selection failed, using default selection: {error}",
     "generateInterviewQuestionsFailed": "Failed to generate interview questions: {error}",
     "generateInterviewSummaryFailed": "Failed to generate interview summary: {error}"
+  },
+  "backend": {
+    "configError": "Configuration error:",
+    "checkEnvConfig": "Please check the configuration in your .env file",
+    "llmApiKeyMissing": "LLM_API_KEY not configured",
+    "zepApiKeyMissing": "ZEP_API_KEY not configured",
+    "fileNotFound": "File not found: {path}",
+    "unsupportedFormat": "Unsupported file format: {format}",
+    "unprocessableFormat": "Cannot process file format: {format}",
+    "pymupdfRequired": "PyMuPDF required: pip install PyMuPDF",
+    "documentHeader": "=== Document {index}: {filename} ===",
+    "documentExtractionFailed": "=== Document {index}: {path} (extraction failed: {error}) ===",
+    "retryFuncFailed": "Function {name} still failing after {retries} retries: {error}",
+    "retryFuncAttempt": "Function {name} attempt {attempt} failed: {error}, retrying in {delay}s...",
+    "retryAsyncFailed": "Async function {name} still failing after {retries} retries: {error}",
+    "retryAsyncAttempt": "Async function {name} attempt {attempt} failed: {error}, retrying in {delay}s...",
+    "retryApiFailed": "API call still failing after {retries} retries: {error}",
+    "retryApiAttempt": "API call attempt {attempt} failed: {error}, retrying in {delay}s...",
+    "retryBatchItemFailed": "Processing item {index} failed: {error}",
+    "interviewPromptPrefix": "Based on your persona, all past memories and actions, reply directly in text without calling any tools:",
+    "llmInvalidJson": "LLM returned invalid JSON: {response}",
+    "llmRetryableError": "Retryable error from model {model} (attempt {attempt}/{max}): {error}. Retrying in {delay}s...",
+    "llmNonRetryableError": "Non-retryable error from model {model}: {error}",
+    "llmModelFailed": "Model {model} failed, trying next fallback: {error}",
+    "llmAllModelsFailed": "All models exhausted. Last error: {error}",
+    "llmRetrySuccess": "LLM call succeeded on attempt {attempt} with model {model}"
   }
 }

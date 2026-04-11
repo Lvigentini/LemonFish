@@ -661,5 +661,31 @@
     "llmSelectAgentFailed": "LLM选择Agent失败，使用默认选择: {error}",
     "generateInterviewQuestionsFailed": "生成采访问题失败: {error}",
     "generateInterviewSummaryFailed": "生成采访摘要失败: {error}"
+  },
+  "backend": {
+    "configError": "配置错误：",
+    "checkEnvConfig": "请检查 .env 文件中的配置",
+    "llmApiKeyMissing": "LLM_API_KEY 未配置",
+    "zepApiKeyMissing": "ZEP_API_KEY 未配置",
+    "fileNotFound": "文件未找到：{path}",
+    "unsupportedFormat": "不支持的文件格式：{format}",
+    "unprocessableFormat": "无法处理的文件格式：{format}",
+    "pymupdfRequired": "需要 PyMuPDF：pip install PyMuPDF",
+    "documentHeader": "=== 文档 {index}：{filename} ===",
+    "documentExtractionFailed": "=== 文档 {index}：{path}（提取失败：{error}）===",
+    "retryFuncFailed": "函数 {name} 在 {retries} 次重试后仍然失败：{error}",
+    "retryFuncAttempt": "函数 {name} 第 {attempt} 次尝试失败：{error}，将在 {delay}s 后重试...",
+    "retryAsyncFailed": "异步函数 {name} 在 {retries} 次重试后仍然失败：{error}",
+    "retryAsyncAttempt": "异步函数 {name} 第 {attempt} 次尝试失败：{error}，将在 {delay}s 后重试...",
+    "retryApiFailed": "API 调用在 {retries} 次重试后仍然失败：{error}",
+    "retryApiAttempt": "API 调用第 {attempt} 次尝试失败：{error}，将在 {delay}s 后重试...",
+    "retryBatchItemFailed": "处理项目 {index} 失败：{error}",
+    "interviewPromptPrefix": "基于你的角色设定、所有过去的记忆和行为，直接用文字回复，不要调用任何工具：",
+    "llmInvalidJson": "LLM 返回了无效的 JSON：{response}",
+    "llmRetryableError": "模型 {model} 的可重试错误（第 {attempt}/{max} 次尝试）：{error}。将在 {delay}s 后重试...",
+    "llmNonRetryableError": "模型 {model} 的不可重试错误：{error}",
+    "llmModelFailed": "模型 {model} 失败，尝试下一个备选模型：{error}",
+    "llmAllModelsFailed": "所有模型均已耗尽。最后一个错误：{error}",
+    "llmRetrySuccess": "LLM 调用在第 {attempt} 次尝试中使用模型 {model} 成功"
   }
 }
