@@ -3,7 +3,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">MIROFISH</div>
+        <div class="brand" @click="router.push('/')">LEMONFISH <span class="version-pill">v{{ appVersion }}</span></div>
       </div>
       
       <div class="header-center">
@@ -90,6 +90,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 const route = useRoute()
 const router = useRouter()
 const { t, tm } = useI18n()
+const appVersion = __APP_VERSION__
 
 // Layout State
 const viewMode = ref('split') // graph | split | workbench
@@ -444,6 +445,20 @@ onUnmounted(() => {
   font-size: 18px;
   letter-spacing: 1px;
   cursor: pointer;
+}
+
+.version-pill {
+  display: inline-block;
+  background: rgba(218, 165, 32, 0.15);
+  color: #DAA520;
+  font-weight: 600;
+  font-size: 0.6rem;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  vertical-align: middle;
+  margin-left: 6px;
 }
 
 .view-switcher {

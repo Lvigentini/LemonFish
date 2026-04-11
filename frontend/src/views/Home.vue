@@ -2,10 +2,10 @@
   <div class="home-container">
     <!-- 顶部导航栏 -->
     <nav class="navbar">
-      <div class="nav-brand">MIROFISH</div>
+      <div class="nav-brand">LEMONFISH <span class="version-pill">v{{ appVersion }}</span></div>
       <div class="nav-links">
         <LanguageSwitcher />
-        <a href="https://github.com/666ghj/MiroFish" target="_blank" class="github-link">
+        <a href="https://github.com/Lvigentini/LemonFish" target="_blank" class="github-link">
           {{ $t('nav.visitGithub') }} <span class="arrow">↗</span>
         </a>
       </div>
@@ -17,7 +17,7 @@
         <div class="hero-left">
           <div class="tag-row">
             <span class="orange-tag">{{ $t('home.tagline') }}</span>
-            <span class="version-text">{{ $t('home.version') }}</span>
+            <span class="version-pill">v{{ appVersion }}</span>
           </div>
           
           <h1 class="main-title">
@@ -218,6 +218,7 @@ import HistoryDatabase from '../components/HistoryDatabase.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 
 const router = useRouter()
+const appVersion = __APP_VERSION__
 
 // 表单数据
 const formData = ref({
@@ -418,10 +419,16 @@ const startSimulation = () => {
   font-size: 0.75rem;
 }
 
-.version-text {
-  color: #999;
-  font-weight: 500;
+.version-pill {
+  display: inline-block;
+  background: rgba(218, 165, 32, 0.15);
+  color: #DAA520;
+  font-weight: 600;
+  font-size: 0.7rem;
   letter-spacing: 0.5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(218, 165, 32, 0.3);
 }
 
 .main-title {
