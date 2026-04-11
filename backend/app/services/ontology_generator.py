@@ -7,6 +7,7 @@ import json
 import logging
 import re
 from typing import Dict, Any, List, Optional
+from ..config import Config
 from ..utils.llm_client import LLMClient
 from ..utils.locale import get_language_instruction
 
@@ -180,7 +181,23 @@ class OntologyGenerator:
     """
     
     def __init__(self, llm_client: Optional[LLMClient] = None):
-        self.llm_client = llm_client or LLMClient()
+        # Use ontology-specific model if configured (e.g., Gemini with 1M context)
+        if llm_client:
+            self.llm_client = llm_client
+        elif Config.LLM_ONTOLOGY_BASE_URL and Config.LLM_ONTOLOGY_API_KEY:
+            logger.info(f"Using ontology-specific model: {Config.LLM_ONTOLOGY_MODEL} "
+                        f"via {Config.LLM_ONTOLOGY_BASE_URL}")
+            self.llm_client = LLMClient(
+                api_key=Config.LLM_ONTOLOGY_API_KEY,
+                base_url=Config.LLM_ONTOLOGY_BASE_URL,
+                model=Config.LLM_ONTOLOGY_MODEL,
+            )
+        else:
+            self.llm_client = LLMClient()
+
+        # Allow per-model text length override (large-context models can take more)
+        if Config.LLM_ONTOLOGY_MAX_TEXT_LENGTH:
+            self.MAX_TEXT_LENGTH_FOR_LLM = Config.LLM_ONTOLOGY_MAX_TEXT_LENGTH
     
     def generate(
         self,

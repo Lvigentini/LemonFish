@@ -32,6 +32,12 @@ class Config:
     LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
     LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-4o-mini')
 
+    # Per-step LLM overrides (ontology benefits from large-context models)
+    LLM_ONTOLOGY_API_KEY = os.environ.get('LLM_ONTOLOGY_API_KEY')
+    LLM_ONTOLOGY_BASE_URL = os.environ.get('LLM_ONTOLOGY_BASE_URL')
+    LLM_ONTOLOGY_MODEL = os.environ.get('LLM_ONTOLOGY_MODEL')
+    LLM_ONTOLOGY_MAX_TEXT_LENGTH = int(os.environ.get('LLM_ONTOLOGY_MAX_TEXT_LENGTH', '0')) or None
+
     # LLM resilience settings
     LLM_MAX_RETRIES = int(os.environ.get('LLM_MAX_RETRIES', '3'))
     LLM_RETRY_BASE_DELAY = float(os.environ.get('LLM_RETRY_BASE_DELAY', '2.0'))
