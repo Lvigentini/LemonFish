@@ -31,6 +31,13 @@ class Config:
     LLM_API_KEY = os.environ.get('LLM_API_KEY')
     LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
     LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-4o-mini')
+
+    # LLM resilience settings
+    LLM_MAX_RETRIES = int(os.environ.get('LLM_MAX_RETRIES', '3'))
+    LLM_RETRY_BASE_DELAY = float(os.environ.get('LLM_RETRY_BASE_DELAY', '2.0'))
+    LLM_FALLBACK_MODELS = [
+        m.strip() for m in os.environ.get('LLM_FALLBACK_MODELS', '').split(',') if m.strip()
+    ]
     
     # Zep配置
     ZEP_API_KEY = os.environ.get('ZEP_API_KEY')
@@ -66,10 +73,11 @@ class Config:
     @classmethod
     def validate(cls):
         """验证必要配置"""
+        from .utils.locale import t
         errors = []
         if not cls.LLM_API_KEY:
-            errors.append("LLM_API_KEY 未配置")
+            errors.append(t('backend.llmApiKeyMissing'))
         if not cls.ZEP_API_KEY:
-            errors.append("ZEP_API_KEY 未配置")
+            errors.append(t('backend.zepApiKeyMissing'))
         return errors
 

@@ -3,10 +3,13 @@
 接口2：使用Zep API构建Standalone Graph
 """
 
+import logging
 import os
 import uuid
 import time
 import threading
+
+logger = logging.getLogger(__name__)
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass
 
@@ -296,52 +299,75 @@ class GraphBuilderService:
         graph_id: str,
         chunks: List[str],
         batch_size: int = 3,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
+        max_batch_retries: int = 3
     ) -> List[str]:
-        """分批添加文本到图谱，返回所有 episode 的 uuid 列表"""
+        """分批添加文本到图谱，返回所有 episode 的 uuid 列表。
+
+        Each batch is retried independently with exponential backoff.
+        Completed batch UUIDs are accumulated incrementally so partial
+        progress survives a later batch failure.
+        """
         episode_uuids = []
         total_chunks = len(chunks)
-        
+
         for i in range(0, total_chunks, batch_size):
             batch_chunks = chunks[i:i + batch_size]
             batch_num = i // batch_size + 1
             total_batches = (total_chunks + batch_size - 1) // batch_size
-            
+
             if progress_callback:
                 progress = (i + len(batch_chunks)) / total_chunks
                 progress_callback(
                     t('progress.sendingBatch', current=batch_num, total=total_batches, chunks=len(batch_chunks)),
                     progress
                 )
-            
+
             # 构建episode数据
             episodes = [
                 EpisodeData(data=chunk, type="text")
                 for chunk in batch_chunks
             ]
-            
-            # 发送到Zep
-            try:
-                batch_result = self.client.graph.add_batch(
-                    graph_id=graph_id,
-                    episodes=episodes
-                )
-                
-                # 收集返回的 episode uuid
-                if batch_result and isinstance(batch_result, list):
-                    for ep in batch_result:
-                        ep_uuid = getattr(ep, 'uuid_', None) or getattr(ep, 'uuid', None)
-                        if ep_uuid:
-                            episode_uuids.append(ep_uuid)
-                
-                # 避免请求过快
-                time.sleep(1)
-                
-            except Exception as e:
+
+            # 发送到Zep with per-batch retry
+            last_error = None
+            for attempt in range(max_batch_retries):
+                try:
+                    batch_result = self.client.graph.add_batch(
+                        graph_id=graph_id,
+                        episodes=episodes
+                    )
+
+                    # 收集返回的 episode uuid
+                    if batch_result and isinstance(batch_result, list):
+                        for ep in batch_result:
+                            ep_uuid = getattr(ep, 'uuid_', None) or getattr(ep, 'uuid', None)
+                            if ep_uuid:
+                                episode_uuids.append(ep_uuid)
+
+                    last_error = None
+                    break  # success
+
+                except Exception as e:
+                    last_error = e
+                    delay = 2.0 * (2 ** attempt)
+                    logger.warning(
+                        f"Batch {batch_num}/{total_batches} failed (attempt {attempt + 1}/{max_batch_retries}): "
+                        f"{type(e).__name__}: {e}. Retrying in {delay:.0f}s..."
+                    )
+                    if attempt < max_batch_retries - 1:
+                        time.sleep(delay)
+
+            if last_error is not None:
+                logger.error(f"Batch {batch_num} failed after {max_batch_retries} attempts. "
+                             f"Completed {len(episode_uuids)} episodes from {batch_num - 1} batches before failure.")
                 if progress_callback:
-                    progress_callback(t('progress.batchFailed', batch=batch_num, error=str(e)), 0)
-                raise
-        
+                    progress_callback(t('progress.batchFailed', batch=batch_num, error=str(last_error)), 0)
+                raise last_error
+
+            # 避免请求过快
+            time.sleep(1)
+
         return episode_uuids
     
     def _wait_for_episodes(
