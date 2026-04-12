@@ -40,4 +40,61 @@ Using a single LLM for all simulated agents introduces monoculture artifacts —
 
 ---
 
+## Feature: LLM Provider & Model Modernisation
+
+### Rationale
+
+A live audit of all 10 supported providers (2026-04-11) found significant drift between `setup.sh` defaults and actual current model availability/pricing. See [`docs/llm_providers.md`](./llm_providers.md) for the verified state of each provider — that file is the source of truth and is maintained on a weekly cadence by the `/llm-provider-tracker` skill.
+
+The drift falls into three categories: stale defaults (newer/cheaper/better models exist), deprecated models still being pointed at, and outdated pricing assumptions in our docs. This needs to be addressed before — or alongside — the multi-model persona work above, because both features depend on having an accurate, current provider catalogue.
+
+### Concrete Issues Found
+
+| File | Line | Current | Should be | Why |
+|------|------|---------|-----------|-----|
+| `setup.sh` | 82 | `claude-sonnet-4-20250514` | `claude-sonnet-4-6` | Same price, better model. Current is `4-6`, not `4-20250514` |
+| `setup.sh` | 91 | `grok-3-mini` | `grok-4-1-fast-non-reasoning` | `grok-3-mini` not visible in current xAI docs; `grok-4-1-fast` is the current budget option |
+| `setup.sh` | 58 | `gpt-4o-mini` | Consider `gpt-5-nano` ($0.05/$0.40) or `gpt-4.1-nano` ($0.10/$0.40) | Cheaper, newer; gpt-4o-mini is mid-tier now |
+| `docs/llm_budget_planning.md` | DeepSeek section | `$0.27/$1.10` | `$0.28/$0.42` | Pricing changed Sep 2025; reasoner now matches chat |
+| `docs/llm_budget_planning.md` | Groq section | Lists `gemma2-9b-it` | Replace with `gpt-oss-20b`, `kimi-k2-instruct`, `qwen3-32b` | gemma2 no longer in Groq lineup |
+| `setup.sh` | provider list | No Groq option | Add Groq as option 9 (move custom to 10) | Documented free tier, fast inference, strong fit |
+| `setup.sh` | provider list | No Ollama option | Add as option 10 | Already documented as compatible |
+
+### Scope
+
+**Phase 1 — Sync existing defaults** (small, high-value):
+1. Update `setup.sh` defaults for Anthropic, Grok, OpenAI
+2. Update `docs/llm_budget_planning.md` provider tables to match `docs/llm_providers.md`
+3. Add Groq and Ollama as first-class options in the wizard (currently only reachable via "custom")
+4. Update `.env.example` if any new env vars are needed for Groq/Ollama defaults
+
+**Phase 2 — Per-step model overrides** (already partially scaffolded):
+The codebase already has `LLM_ONTOLOGY_API_KEY` / `LLM_ONTOLOGY_BASE_URL` / `LLM_ONTOLOGY_MODEL` env vars in `backend/app/config.py:36-39` but they're not exposed in the wizard or documented. Different pipeline steps have very different requirements:
+
+| Step | Best fit | Why |
+|------|----------|-----|
+| Ontology generation | Long-context, high-quality (Gemini 2.5 Pro, Claude Sonnet 4.6, GPT-5.4) | One call, large input, must produce structured ontology — quality matters more than cost |
+| Profile generation | Cheap, fast, JSON-capable (gpt-5-nano, gemini-flash-lite, deepseek-chat) | N parallel calls, structured output, low individual stakes |
+| Simulation | Cheap free-tier (Groq llama-3.1-8b, OpenRouter free, Gemini Flash) | Dominates cost (~90% of tokens) — must be free or near-free to be viable |
+| Report (ReACT) | Mid-tier reasoning (Claude Sonnet, Gemini 2.5 Pro, gpt-4.1) | Tool calls + multi-step reasoning, but single user-facing artefact |
+
+Expose the per-step overrides in the wizard and document them. This is the natural precursor to multi-model persona assignment because it proves the codebase can route different calls to different providers.
+
+**Phase 3 — Provider capability detection** (defensive):
+At LLMClient init, probe whether the configured provider supports `response_format`. If not (Anthropic, possibly Grok), switch to prompt-based JSON extraction automatically rather than relying on the current "strip markdown fences" workaround. Currently `chat_json()` in `backend/app/utils/llm_client.py:126` always passes `response_format` and hopes for the best.
+
+### Open Questions
+
+- Do we want a "recommended preset" UX? E.g., wizard asks "free tier" / "best quality" / "balanced" / "Chinese-language" and picks providers + per-step assignments accordingly
+- Should the wizard fetch the live provider catalogue (via the `/llm-provider-tracker` skill output) at install time, or trust the static defaults
+- The per-step overrides currently only exist for ontology — should we add `LLM_SIMULATION_*`, `LLM_REPORT_*`, `LLM_PROFILES_*` for symmetry, or does that overcomplicate the env file?
+- How does this interact with the multi-model persona feature? Per-step overrides are orthogonal to per-agent assignment, but the config schema needs to accommodate both without becoming unreadable
+
+### Dependencies
+
+- Must run after / alongside `/llm-provider-tracker audit` to get the latest verified data
+- Multi-model persona feature (above) depends on Phase 2 of this — having a clean way to route different calls to different providers is a prerequisite
+
+---
+
 ## Feature: [placeholder — add next feature here]

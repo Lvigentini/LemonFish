@@ -1,5 +1,7 @@
 # LemonFish — LLM Budget & Multi-Provider Planning
 
+> **Note:** Provider pricing, rate limits, and model availability change frequently. For the canonical, verified-weekly provider catalogue, see [`docs/llm_providers.md`](./llm_providers.md), maintained by the `/llm-provider-tracker` skill. If anything in this document contradicts `llm_providers.md`, the provider doc wins.
+
 ## Token Consumption Model
 
 There is **no token tracking** in the codebase currently. All estimates below are derived from measuring the actual prompt templates.
@@ -83,10 +85,13 @@ Using only the reliable renewable providers:
 | Provider | Model | Daily tokens | RPD |
 |----------|-------|-------------|-----|
 | Groq | llama-3.1-8b-instant | 500K | 14,400 |
-| Groq | llama-4-scout-17b | 500K | 1,000 |
 | Groq | qwen3-32b | 500K | 1,000 |
-| Groq | llama-3.3-70b | 100K | 1,000 |
-| Google | gemini-2.5-flash | ~1M+ | ~1,500 |
+| Groq | kimi-k2-instruct | 300K | 1,000 |
+| Groq | gpt-oss-120b | 200K | 1,000 |
+| Groq | gpt-oss-20b | 200K | 1,000 |
+| Groq | llama-3.3-70b-versatile | 100K | 1,000 |
+| Google | gemini-2.5-flash-lite | ~1M+ | ~1,500 |
+| Google | gemini-3-flash-preview | ~1M+ | ~1,500 |
 | SambaNova | deepseek-v3.1 | 200K | 20 |
 | SambaNova | llama-3.3-70b | 200K | 20 |
 | **Total** | | **~3M+/day** | |
