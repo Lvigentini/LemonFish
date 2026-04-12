@@ -106,15 +106,22 @@ def _make_reddit_wrapper(original):
                 else:
                     per_agent_model = model  # fall back to shared
 
+                # Phase 7.16: the persona string already includes the Big Five /
+                # org archetype narrative appended by OasisProfileGenerator, so it
+                # reaches the agent via the existing user_profile injection path
+                # in oasis.social_platform.config.user.UserInfo.to_reddit_system_message.
+                # The mbti/age/gender/country fields below are legacy display
+                # fields that OASIS's built-in Reddit template also consumes —
+                # kept for compatibility.
                 profile = {
                     'nodes': [],
                     'edges': [],
                     'other_info': {
                         'user_profile': agent_info[i]['persona'],
-                        'mbti': agent_info[i]['mbti'],
-                        'gender': agent_info[i]['gender'],
-                        'age': agent_info[i]['age'],
-                        'country': agent_info[i]['country'],
+                        'mbti': agent_info[i].get('mbti', 'ISTJ'),
+                        'gender': agent_info[i].get('gender', 'other'),
+                        'age': agent_info[i].get('age', 30),
+                        'country': agent_info[i].get('country', 'Australia'),
                     },
                 }
                 user_info = UserInfo(

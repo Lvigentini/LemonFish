@@ -38,44 +38,73 @@ def _record_token_usage(response, model: str, base_url: Optional[str] = None):
     except Exception:
         pass
 from .zep_entity_reader import EntityNode, ZepEntityReader
+from .personality_frameworks import (
+    BIG_FIVE_DIMENSIONS,
+    ORG_ARCHETYPES,
+    ORG_TRAIT_DIMENSIONS,
+    ARCHETYPE_DEFAULT_TRAITS,
+    big_five_narrative,
+    org_traits_narrative,
+    random_big_five,
+    validate_big_five,
+    validate_archetype,
+    validate_org_traits,
+    archetype_for_entity_type,
+)
 
 logger = get_logger('mirofish.oasis_profile')
 
 
 @dataclass
 class OasisAgentProfile:
-    """OASIS Agent Profile数据结构"""
-    # 通用字段
+    """OASIS Agent Profile data structure.
+
+    Phase 7.16: personality fields have been upgraded from MBTI (legacy,
+    kept for display) to research-backed frameworks:
+      - Individuals use Big Five / FFM (big_five dict with 5 scores 0-100)
+      - Institutions use an archetype + behavioural traits
+        (org_archetype string + org_traits dict with 5 scores 0-100)
+    See backend/app/services/personality_frameworks.py and
+    docs/personality_frameworks.md for rationale.
+    """
+    # Core fields
     user_id: int
     user_name: str
     name: str
     bio: str
     persona: str
-    
-    # 可选字段 - Reddit风格
+
+    # Reddit-specific
     karma: int = 1000
-    
-    # 可选字段 - Twitter风格
+
+    # Twitter-specific
     friend_count: int = 100
     follower_count: int = 150
     statuses_count: int = 500
-    
-    # 额外人设信息
+
+    # Demographic + legacy fields
     age: Optional[int] = None
     gender: Optional[str] = None
-    mbti: Optional[str] = None
+    mbti: Optional[str] = None  # Legacy — kept for display, not used behaviorally
     country: Optional[str] = None
     profession: Optional[str] = None
     interested_topics: List[str] = field(default_factory=list)
-    
-    # 来源实体信息
+
+    # Phase 7.16: Research-backed personality frameworks
+    # Individuals: Big Five scores (0-100 each)
+    big_five: Optional[Dict[str, int]] = None
+    # Institutions: archetype + behavioural traits
+    org_archetype: Optional[str] = None  # one of 8 defined archetypes
+    org_traits: Optional[Dict[str, int]] = None  # 5 behavioural dimensions (0-100)
+
+    # Source traceability
     source_entity_uuid: Optional[str] = None
     source_entity_type: Optional[str] = None
-    
+
     created_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
     
     def to_reddit_format(self) -> Dict[str, Any]:
-        """转换为Reddit平台格式"""
+        """Serialize to Reddit-platform format used by OASIS."""
         profile = {
             "user_id": self.user_id,
             "username": self.user_name,  # OASIS 库要求字段名为 username（无下划线）
@@ -85,8 +114,8 @@ class OasisAgentProfile:
             "karma": self.karma,
             "created_at": self.created_at,
         }
-        
-        # 添加额外人设信息（如果有）
+
+        # Demographic + legacy fields
         if self.age:
             profile["age"] = self.age
         if self.gender:
@@ -99,14 +128,22 @@ class OasisAgentProfile:
             profile["profession"] = self.profession
         if self.interested_topics:
             profile["interested_topics"] = self.interested_topics
-        
+
+        # Phase 7.16 research-backed fields
+        if self.big_five:
+            profile["big_five"] = self.big_five
+        if self.org_archetype:
+            profile["org_archetype"] = self.org_archetype
+        if self.org_traits:
+            profile["org_traits"] = self.org_traits
+
         return profile
     
     def to_twitter_format(self) -> Dict[str, Any]:
-        """转换为Twitter平台格式"""
+        """Serialize to Twitter-platform format used by OASIS."""
         profile = {
             "user_id": self.user_id,
-            "username": self.user_name,  # OASIS 库要求字段名为 username（无下划线）
+            "username": self.user_name,
             "name": self.name,
             "bio": self.bio,
             "persona": self.persona,
@@ -115,8 +152,7 @@ class OasisAgentProfile:
             "statuses_count": self.statuses_count,
             "created_at": self.created_at,
         }
-        
-        # 添加额外人设信息
+
         if self.age:
             profile["age"] = self.age
         if self.gender:
@@ -129,11 +165,19 @@ class OasisAgentProfile:
             profile["profession"] = self.profession
         if self.interested_topics:
             profile["interested_topics"] = self.interested_topics
-        
+
+        # Phase 7.16 research-backed fields
+        if self.big_five:
+            profile["big_five"] = self.big_five
+        if self.org_archetype:
+            profile["org_archetype"] = self.org_archetype
+        if self.org_traits:
+            profile["org_traits"] = self.org_traits
+
         return profile
     
     def to_dict(self) -> Dict[str, Any]:
-        """转换为完整字典格式"""
+        """Full dict representation of the profile."""
         return {
             "user_id": self.user_id,
             "user_name": self.user_name,
@@ -150,6 +194,9 @@ class OasisAgentProfile:
             "country": self.country,
             "profession": self.profession,
             "interested_topics": self.interested_topics,
+            "big_five": self.big_five,
+            "org_archetype": self.org_archetype,
+            "org_traits": self.org_traits,
             "source_entity_uuid": self.source_entity_uuid,
             "source_entity_type": self.source_entity_type,
             "created_at": self.created_at,
@@ -273,22 +320,59 @@ class OasisProfileGenerator:
                 entity_attributes=entity.attributes
             )
         
+        # Phase 7.16: extract + validate research-backed personality frameworks
+        # Individuals get Big Five; institutions get archetype + org_traits.
+        is_individual = self._is_individual_entity(entity_type)
+
+        big_five = None
+        org_archetype = None
+        org_traits = None
+        personality_narrative = ''
+
+        if is_individual:
+            big_five_raw = profile_data.get('big_five')
+            if big_five_raw:
+                big_five = validate_big_five(big_five_raw)
+                personality_narrative = big_five_narrative(big_five)
+        else:
+            archetype_raw = profile_data.get('org_archetype')
+            if archetype_raw:
+                org_archetype = validate_archetype(archetype_raw)
+            else:
+                org_archetype = archetype_for_entity_type(entity_type)
+            traits_raw = profile_data.get('org_traits')
+            org_traits = validate_org_traits(traits_raw, org_archetype)
+            personality_narrative = org_traits_narrative(org_archetype, org_traits)
+
+        # Append the structured personality narrative to the persona string
+        # so it reaches the OASIS agent via the existing user_profile injection
+        # path (see docs/oasis_dev.md Part 1.2 — persona is the only text
+        # field that reaches the agent system prompt).
+        base_persona = profile_data.get("persona", entity.summary or f"A {entity_type} named {name}.")
+        if personality_narrative:
+            full_persona = f"{base_persona}\n\n{personality_narrative}"
+        else:
+            full_persona = base_persona
+
         return OasisAgentProfile(
             user_id=user_id,
             user_name=user_name,
             name=name,
             bio=profile_data.get("bio", f"{entity_type}: {name}"),
-            persona=profile_data.get("persona", entity.summary or f"A {entity_type} named {name}."),
+            persona=full_persona,
             karma=profile_data.get("karma", random.randint(500, 5000)),
             friend_count=profile_data.get("friend_count", random.randint(50, 500)),
             follower_count=profile_data.get("follower_count", random.randint(100, 1000)),
             statuses_count=profile_data.get("statuses_count", random.randint(100, 2000)),
             age=profile_data.get("age"),
             gender=profile_data.get("gender"),
-            mbti=profile_data.get("mbti"),
+            mbti=profile_data.get("mbti"),  # Legacy field, kept for display
             country=profile_data.get("country"),
             profession=profile_data.get("profession"),
             interested_topics=profile_data.get("interested_topics", []),
+            big_five=big_five,
+            org_archetype=org_archetype,
+            org_traits=org_traits,
             source_entity_uuid=entity.uuid,
             source_entity_type=entity_type,
         )
@@ -708,40 +792,54 @@ class OasisProfileGenerator:
         attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "无"
         context_str = context[:3000] if context else "无额外上下文"
         
-        return f"""为实体生成详细的社交媒体用户人设,最大程度还原已有现实情况。
+        return f"""Generate a detailed social-media persona for the given individual entity, staying as faithful as possible to the source material.
 
-实体名称: {entity_name}
-实体类型: {entity_type}
-实体摘要: {entity_summary}
-实体属性: {attrs_str}
+Entity name: {entity_name}
+Entity type: {entity_type}
+Entity summary: {entity_summary}
+Entity attributes: {attrs_str}
 
-上下文信息:
+Context:
 {context_str}
 
-请生成JSON，包含以下字段:
+Return JSON with the following fields:
 
-1. bio: 社交媒体简介，200字
-2. persona: 详细人设描述（2000字的纯文本），需包含:
-   - 基本信息（年龄、职业、教育背景、所在地）
-   - 人物背景（重要经历、与事件的关联、社会关系）
-   - 性格特征（MBTI类型、核心性格、情绪表达方式）
-   - 社交媒体行为（发帖频率、内容偏好、互动风格、语言特点）
-   - 立场观点（对话题的态度、可能被激怒/感动的内容）
-   - 独特特征（口头禅、特殊经历、个人爱好）
-   - 个人记忆（人设的重要部分，要介绍这个个体与事件的关联，以及这个个体在事件中的已有动作与反应）
-3. age: 年龄数字（必须是整数）
-4. gender: 性别，必须是英文: "male" 或 "female"
-5. mbti: MBTI类型（如INTJ、ENFP等）
-6. country: 国家（使用中文，如"中国"）
-7. profession: 职业
-8. interested_topics: 感兴趣话题数组
+1. bio: 200-character social media bio.
+2. persona: 2000-character detailed persona as a single prose block, covering:
+   - Basic info (age, profession, education, location)
+   - Background (key events, relationship to the simulation topic, social ties)
+   - Social media behaviour (posting frequency, content preferences, interaction style, language patterns)
+   - Stances (attitudes toward the topic, what provokes or moves them)
+   - Distinctive traits (catchphrases, unique experiences, hobbies)
+   - Personal memories linked to the event (their prior actions and reactions)
+3. age: integer age
+4. gender: "male" or "female"
+5. country: country name in English (e.g., "Australia", "China", "United Kingdom")
+6. profession: profession or role
+7. interested_topics: array of interest tags
 
-重要:
-- 所有字段值必须是字符串或数字，不要使用换行符
-- persona必须是一段连贯的文字描述
-- {get_language_instruction()} (gender字段必须用英文male/female)
-- 内容要与实体信息保持一致
-- age必须是有效的整数，gender必须是"male"或"female"
+8. **big_five**: object with 5 integer scores 0-100 based on the Big Five / Five Factor Model.
+   This is research-backed personality psychology — use the entity's background, statements,
+   and actions in the source material to ground each score. Include:
+   - openness (0=conventional, 100=curious/inventive)
+   - conscientiousness (0=spontaneous, 100=organised/disciplined)
+   - extraversion (0=reserved/introverted, 100=outgoing/assertive)
+   - agreeableness (0=skeptical/competitive, 100=cooperative/empathetic)
+   - neuroticism (0=emotionally stable, 100=emotionally reactive/anxious)
+   IMPORTANT: score each dimension independently and vary across agents. Do NOT give
+   every agent the same middle-of-the-road profile. An expert in a contested field
+   should score high in conscientiousness and low in agreeableness. A local community
+   organiser should score high in extraversion and agreeableness. Use the source
+   material to justify the numbers — reference the scores in the persona prose.
+
+9. mbti: optional MBTI type (legacy field, kept for display — pick any plausible 4-letter code)
+
+Rules:
+- All field values must be strings, numbers, or objects — no newlines inside strings.
+- persona must be a single coherent prose block (no line breaks).
+- Respond in the user's language for bio/persona text. Gender must be English "male"/"female".
+- Ensure the content is consistent with the entity information.
+- big_five scores must be integers 0-100.
 """
 
     def _build_group_persona_prompt(
@@ -757,40 +855,63 @@ class OasisProfileGenerator:
         attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "无"
         context_str = context[:3000] if context else "无额外上下文"
         
-        return f"""为机构/群体实体生成详细的社交媒体账号设定,最大程度还原已有现实情况。
+        archetype_options = '\n'.join(
+            f"   - {key}: {data['description']}"
+            for key, data in ORG_ARCHETYPES.items()
+        )
 
-实体名称: {entity_name}
-实体类型: {entity_type}
-实体摘要: {entity_summary}
-实体属性: {attrs_str}
+        return f"""Generate a detailed social-media persona for the given institutional/organisational entity, staying faithful to the source material.
 
-上下文信息:
+Entity name: {entity_name}
+Entity type: {entity_type}
+Entity summary: {entity_summary}
+Entity attributes: {attrs_str}
+
+Context:
 {context_str}
 
-请生成JSON，包含以下字段:
+Return JSON with the following fields:
 
-1. bio: 官方账号简介，200字，专业得体
-2. persona: 详细账号设定描述（2000字的纯文本），需包含:
-   - 机构基本信息（正式名称、机构性质、成立背景、主要职能）
-   - 账号定位（账号类型、目标受众、核心功能）
-   - 发言风格（语言特点、常用表达、禁忌话题）
-   - 发布内容特点（内容类型、发布频率、活跃时间段）
-   - 立场态度（对核心话题的官方立场、面对争议的处理方式）
-   - 特殊说明（代表的群体画像、运营习惯）
-   - 机构记忆（机构人设的重要部分，要介绍这个机构与事件的关联，以及这个机构在事件中的已有动作与反应）
-3. age: 固定填30（机构账号的虚拟年龄）
-4. gender: 固定填"other"（机构账号使用other表示非个人）
-5. mbti: MBTI类型，用于描述账号风格，如ISTJ代表严谨保守
-6. country: 国家（使用中文，如"中国"）
-7. profession: 机构职能描述
-8. interested_topics: 关注领域数组
+1. bio: 200-character official account bio, professional tone.
+2. persona: 2000-character detailed institutional persona as a single prose block, covering:
+   - Institutional basics (formal name, nature, founding, mandate)
+   - Account positioning (target audience, core function)
+   - Communication style (language register, common expressions, taboo topics)
+   - Content patterns (content types, posting frequency, active hours)
+   - Stances (official position on core topics, controversy handling)
+   - Represented constituency, operational habits
+   - Institutional memory linked to the event (prior actions and reactions)
+3. age: integer 30 (virtual age marker for institutions)
+4. gender: "other" (institutional accounts use "other")
+5. country: country name in English (e.g., "Australia")
+6. profession: functional description of the institution
+7. interested_topics: array of focus-area tags
 
-重要:
-- 所有字段值必须是字符串或数字，不允许null值
-- persona必须是一段连贯的文字描述，不要使用换行符
-- {get_language_instruction()} (gender字段必须用英文"other")
-- age必须是整数30，gender必须是字符串"other"
-- 机构账号发言要符合其身份定位"""
+8. **org_archetype**: choose ONE of the following 8 archetypes that best matches how this
+   institution presents on social media. The archetype should reflect communication style
+   and institutional voice, not formal organisational theory:
+{archetype_options}
+
+9. **org_traits**: object with 5 integer scores 0-100 describing the institution's
+   public communication behaviour. Ground these in what the source material says about
+   how the institution actually communicates, not defaults:
+   - formality (0=casual/colloquial, 100=formal/press-release style)
+   - risk_tolerance (0=controversy-averse, 100=willing to take strong public stances)
+   - transparency (0=opaque/boilerplate, 100=open about processes and uncertainty)
+   - responsiveness (0=slow/scheduled, 100=real-time engagement)
+   - ideological_intensity (0=position-neutral, 100=strong repeated public stances)
+   IMPORTANT: vary scores across institutions. A scrappy NGO and a government ministry
+   must have clearly different profiles. Reference the traits in the persona prose.
+
+10. mbti: optional MBTI type (legacy field, kept for display — e.g., "ISTJ")
+
+Rules:
+- All field values must be strings, numbers, or objects — no null values, no newlines in strings.
+- persona must be a single coherent prose block (no line breaks).
+- Respond in the user's language for bio/persona text. gender must be "other".
+- age must be integer 30.
+- org_archetype must be one of the 8 lowercase values listed above.
+- org_traits must contain all 5 integer keys."""
     
     def _generate_profile_rule_based(
         self,
@@ -804,6 +925,10 @@ class OasisProfileGenerator:
         # 根据实体类型生成不同的人设
         entity_type_lower = entity_type.lower()
         
+        # Phase 7.16: rule-based fallbacks now include Big Five / org archetype
+        # so downstream code sees consistent field shapes whether the LLM
+        # succeeded or the fallback was used.
+
         if entity_type_lower in ["student", "alumni"]:
             return {
                 "bio": f"{entity_type} with interests in academics and social issues.",
@@ -814,8 +939,9 @@ class OasisProfileGenerator:
                 "country": random.choice(self.COUNTRIES),
                 "profession": "Student",
                 "interested_topics": ["Education", "Social Issues", "Technology"],
+                "big_five": random_big_five(),
             }
-        
+
         elif entity_type_lower in ["publicfigure", "expert", "faculty"]:
             return {
                 "bio": f"Expert and thought leader in their field.",
@@ -826,35 +952,50 @@ class OasisProfileGenerator:
                 "country": random.choice(self.COUNTRIES),
                 "profession": entity_attributes.get("occupation", "Expert"),
                 "interested_topics": ["Politics", "Economics", "Culture & Society"],
+                # Experts skew high on conscientiousness, lower on agreeableness
+                "big_five": {
+                    'openness': random.randint(60, 85),
+                    'conscientiousness': random.randint(65, 90),
+                    'extraversion': random.randint(35, 70),
+                    'agreeableness': random.randint(25, 55),
+                    'neuroticism': random.randint(20, 50),
+                },
             }
-        
+
         elif entity_type_lower in ["mediaoutlet", "socialmediaplatform"]:
+            archetype = 'media'
             return {
                 "bio": f"Official account for {entity_name}. News and updates.",
                 "persona": f"{entity_name} is a media entity that reports news and facilitates public discourse. The account shares timely updates and engages with the audience on current events.",
-                "age": 30,  # 机构虚拟年龄
-                "gender": "other",  # 机构使用other
-                "mbti": "ISTJ",  # 机构风格：严谨保守
-                "country": "中国",
+                "age": 30,
+                "gender": "other",
+                "mbti": "ISTJ",  # Legacy
+                "country": random.choice(self.COUNTRIES),
                 "profession": "Media",
                 "interested_topics": ["General News", "Current Events", "Public Affairs"],
+                "org_archetype": archetype,
+                "org_traits": dict(ARCHETYPE_DEFAULT_TRAITS[archetype]),
             }
-        
+
         elif entity_type_lower in ["university", "governmentagency", "ngo", "organization"]:
+            archetype = archetype_for_entity_type(entity_type)
             return {
                 "bio": f"Official account of {entity_name}.",
                 "persona": f"{entity_name} is an institutional entity that communicates official positions, announcements, and engages with stakeholders on relevant matters.",
-                "age": 30,  # 机构虚拟年龄
-                "gender": "other",  # 机构使用other
-                "mbti": "ISTJ",  # 机构风格：严谨保守
-                "country": "中国",
+                "age": 30,
+                "gender": "other",
+                "mbti": "ISTJ",  # Legacy
+                "country": random.choice(self.COUNTRIES),
                 "profession": entity_type,
                 "interested_topics": ["Public Policy", "Community", "Official Announcements"],
+                "org_archetype": archetype,
+                "org_traits": dict(ARCHETYPE_DEFAULT_TRAITS[archetype]),
             }
-        
+
         else:
-            # 默认人设
-            return {
+            # Default persona — treat as individual unless the entity type looks institutional
+            is_individual = self._is_individual_entity(entity_type)
+            result = {
                 "bio": entity_summary[:150] if entity_summary else f"{entity_type}: {entity_name}",
                 "persona": entity_summary or f"{entity_name} is a {entity_type.lower()} participating in social discussions.",
                 "age": random.randint(25, 50),
@@ -864,6 +1005,16 @@ class OasisProfileGenerator:
                 "profession": entity_type,
                 "interested_topics": ["General", "Social Issues"],
             }
+            if is_individual:
+                result["big_five"] = random_big_five()
+            else:
+                archetype = archetype_for_entity_type(entity_type)
+                result["gender"] = "other"
+                result["age"] = 30
+                result["mbti"] = "ISTJ"
+                result["org_archetype"] = archetype
+                result["org_traits"] = dict(ARCHETYPE_DEFAULT_TRAITS[archetype])
+            return result
     
     def set_graph_id(self, graph_id: str):
         """设置图谱ID用于Zep检索"""
@@ -1193,19 +1344,27 @@ class OasisProfileGenerator:
                 "persona": profile.persona or f"{profile.name} is a participant in social discussions.",
                 "karma": profile.karma if profile.karma else 1000,
                 "created_at": profile.created_at,
-                # OASIS必需字段 - 确保都有默认值
+                # OASIS required fields (always defaulted)
                 "age": profile.age if profile.age else 30,
                 "gender": self._normalize_gender(profile.gender),
                 "mbti": profile.mbti if profile.mbti else "ISTJ",
-                "country": profile.country if profile.country else "中国",
+                "country": profile.country if profile.country else "Australia",
             }
-            
-            # 可选字段
+
+            # Optional legacy fields
             if profile.profession:
                 item["profession"] = profile.profession
             if profile.interested_topics:
                 item["interested_topics"] = profile.interested_topics
-            
+
+            # Phase 7.16 research-backed fields
+            if profile.big_five:
+                item["big_five"] = profile.big_five
+            if profile.org_archetype:
+                item["org_archetype"] = profile.org_archetype
+            if profile.org_traits:
+                item["org_traits"] = profile.org_traits
+
             data.append(item)
         
         with open(file_path, 'w', encoding='utf-8') as f:

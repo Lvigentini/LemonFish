@@ -414,8 +414,10 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
 | v0.6.0 | Phase 4 (multi-provider pool foundation) | 🚧 shipped without OASIS routing |
 | v0.7.0 | Phase 5 (capability detection) | ✅ |
 | v0.8.0 | Phase 6 (multi-model personas) | ✅ |
-| v0.9.0 (current) | Phase 7 (QoL: pre-flight modal, cancel, orphan cleanup) | ✅ |
-| v0.10.0 | Phase 8 (research-from-prompt add-on module) | 📋 next |
-| v1.0.0 | Full feature set, stable API + live end-to-end tested | 💡 |
+| v0.9.0 | Phase 7 start (pre-flight modal, cancel, orphan cleanup) | ✅ |
+| v0.9.1 | Phase 7 polish (retry, batch progress, upload persistence) | ✅ |
+| v0.9.2 | Phase 7 complete (all 15 QoL items: quality scoring, reconciliation, CSV input, cost warning, budget tracker, etc.) | ✅ |
+| **v1.0.0 (current)** | **Phase 7.16 personality frameworks — replaced MBTI with research-backed Big Five (individuals) and organisational archetypes (institutions). Milestone release.** | ✅ |
+| v0.10.0 / v1.1.0 | Phase 8 (research-from-prompt add-on module) | 📋 parallel track |
 
 Versions are indicative, not deadlines. Features may ship sooner if they unlock testable value.
