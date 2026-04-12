@@ -124,7 +124,7 @@
           <p class="description">
             {{ $t('step1.graphRagDesc') }}
           </p>
-          
+
           <!-- Stats Cards -->
           <div class="stats-grid">
             <div class="stat-card">
@@ -139,6 +139,17 @@
               <span class="stat-value">{{ graphStats.types }}</span>
               <span class="stat-label">{{ $t('step1.schemaTypes') }}</span>
             </div>
+          </div>
+
+          <!-- Cancel button (Phase 7 — only while build is running) -->
+          <div v-if="currentPhase === 1 && !cancelling" class="cancel-row">
+            <button class="cancel-btn" @click="handleCancelBuild">
+              ⨯ {{ $t('step1.cancelBuild') || 'Cancel build' }}
+            </button>
+            <span class="cancel-hint">{{ $t('step1.cancelHint') || 'Stops at next batch. Progress already made is preserved.' }}</span>
+          </div>
+          <div v-if="cancelling" class="cancel-row">
+            <span class="cancel-pending">{{ $t('step1.cancelPending') || 'Cancellation requested — waiting for next batch boundary…' }}</span>
           </div>
         </div>
       </div>
@@ -191,6 +202,7 @@ import { computed, ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { createSimulation } from '../api/simulation'
+import { cancelTask } from '../api/graph'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -204,11 +216,39 @@ const props = defineProps({
   systemLogs: { type: Array, default: () => [] }
 })
 
-defineEmits(['next-step'])
+const emit = defineEmits(['next-step', 'build-cancelled', 'add-log'])
 
 const selectedOntologyItem = ref(null)
 const logContent = ref(null)
 const creatingSimulation = ref(false)
+const cancelling = ref(false)
+
+// Phase 7: cancel a running graph build at the next batch boundary
+const handleCancelBuild = async () => {
+  const taskId = props.buildProgress?.task_id || props.projectData?.graph_build_task_id
+  if (!taskId) {
+    console.error('No active task_id to cancel')
+    return
+  }
+  if (!confirm(t('step1.cancelConfirm') || 'Cancel the graph build? Progress already made will be preserved.')) {
+    return
+  }
+  cancelling.value = true
+  try {
+    await cancelTask(taskId)
+    emit('add-log', `[cancel] Cancellation requested for task ${taskId}`)
+    emit('build-cancelled', taskId)
+  } catch (e) {
+    cancelling.value = false
+    console.error('Cancel failed:', e)
+    alert('Failed to cancel: ' + (e?.message || e))
+  }
+}
+
+// Reset cancelling flag when build progresses to a new state
+watch(() => props.currentPhase, (phase) => {
+  if (phase !== 1) cancelling.value = false
+})
 
 // 进入环境搭建 - 创建 simulation 并跳转
 const handleEnterEnvSetup = async () => {
@@ -696,5 +736,40 @@ watch(() => props.systemLogs.length, () => {
 .log-msg {
   color: #CCC;
   word-break: break-all;
+}
+
+/* Phase 7: Cancel button styles */
+.cancel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.cancel-btn {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #f87171;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.cancel-btn:hover {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.6);
+}
+.cancel-hint {
+  color: #777;
+  font-size: 0.75rem;
+  flex: 1;
+}
+.cancel-pending {
+  color: #facc15;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 </style>

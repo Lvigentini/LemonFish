@@ -75,7 +75,13 @@
     "layoutGraph": "Graphe",
     "layoutSplit": "Partagé",
     "layoutWorkbench": "Atelier",
-    "stepNames": ["Construction du graphe", "Configuration de l'environnement", "Lancer la simulation", "Génération du rapport", "Interaction approfondie"]
+    "stepNames": [
+      "Construction du graphe",
+      "Configuration de l'environnement",
+      "Lancer la simulation",
+      "Génération du rapport",
+      "Interaction approfondie"
+    ]
   },
   "step1": {
     "ontologyGeneration": "Génération de l'ontologie",
@@ -95,7 +101,11 @@
     "creating": "Création...",
     "enterEnvSetup": "Configurer l'environnement",
     "createSimulationFailed": "Échec de la création de la simulation : {error}",
-    "createSimulationException": "Erreur de création de simulation : {error}"
+    "createSimulationException": "Erreur de création de simulation : {error}",
+    "cancelBuild": "Annuler la construction",
+    "cancelHint": "S'arrête au prochain lot. La progression déjà effectuée est préservée.",
+    "cancelPending": "Annulation demandée — en attente de la prochaine limite de lot…",
+    "cancelConfirm": "Annuler la construction du graphe ? La progression déjà effectuée sera préservée."
   },
   "step2": {
     "simInstanceInit": "Initialisation de l'instance de simulation",
@@ -316,7 +326,8 @@
     "notStarted": "Non démarré",
     "roundsProgress": "{current}/{total} tours",
     "untitledSimulation": "Simulation sans titre",
-    "unknownFile": "Fichier inconnu"
+    "unknownFile": "Fichier inconnu",
+    "resumeButton": "Reprendre à"
   },
   "api": {
     "projectNotFound": "Projet introuvable : {id}",

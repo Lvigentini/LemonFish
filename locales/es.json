@@ -75,7 +75,13 @@
     "layoutGraph": "Grafo",
     "layoutSplit": "Dividido",
     "layoutWorkbench": "Panel de Trabajo",
-    "stepNames": ["Construcción del Grafo", "Config. del Entorno", "Ejecutar Simulación", "Generación de Informe", "Interacción Profunda"]
+    "stepNames": [
+      "Construcción del Grafo",
+      "Config. del Entorno",
+      "Ejecutar Simulación",
+      "Generación de Informe",
+      "Interacción Profunda"
+    ]
   },
   "step1": {
     "ontologyGeneration": "Generación de Ontología",
@@ -95,7 +101,11 @@
     "creating": "Creando...",
     "enterEnvSetup": "Entrar a Configuración del Entorno",
     "createSimulationFailed": "Error al crear simulación: {error}",
-    "createSimulationException": "Error en creación de simulación: {error}"
+    "createSimulationException": "Error en creación de simulación: {error}",
+    "cancelBuild": "Cancelar construcción",
+    "cancelHint": "Se detiene en el próximo lote. El progreso ya realizado se conserva.",
+    "cancelPending": "Cancelación solicitada — esperando el límite del próximo lote…",
+    "cancelConfirm": "¿Cancelar la construcción del grafo? El progreso ya realizado se conservará."
   },
   "step2": {
     "simInstanceInit": "Inicialización de Instancia de Simulación",
@@ -316,7 +326,8 @@
     "notStarted": "No iniciado",
     "roundsProgress": "{current}/{total} rondas",
     "untitledSimulation": "Simulación sin título",
-    "unknownFile": "Archivo desconocido"
+    "unknownFile": "Archivo desconocido",
+    "resumeButton": "Continuar en"
   },
   "api": {
     "projectNotFound": "Proyecto no encontrado: {id}",

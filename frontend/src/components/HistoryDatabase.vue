@@ -150,10 +150,21 @@
               <span class="divider-line"></span>
             </div>
 
+            <!-- Phase 7: Smart Resume button — jumps to furthest available step -->
+            <div v-if="selectedProject" class="modal-resume-row">
+              <button
+                class="modal-btn btn-resume"
+                @click="goToResume"
+              >
+                <span class="btn-icon">⟶</span>
+                <span class="btn-text">{{ $t('history.resumeButton') || 'Resume at' }} {{ resumeLabel }}</span>
+              </button>
+            </div>
+
             <!-- 导航按钮 -->
             <div class="modal-actions">
-              <button 
-                class="modal-btn btn-project" 
+              <button
+                class="modal-btn btn-project"
                 @click="goToProject"
                 :disabled="!selectedProject.project_id"
               >
@@ -161,16 +172,16 @@
                 <span class="btn-icon">◇</span>
                 <span class="btn-text">{{ $t('history.step1Button') }}</span>
               </button>
-              <button 
-                class="modal-btn btn-simulation" 
+              <button
+                class="modal-btn btn-simulation"
                 @click="goToSimulation"
               >
                 <span class="btn-step">Step2</span>
                 <span class="btn-icon">◈</span>
                 <span class="btn-text">{{ $t('history.step2Button') }}</span>
               </button>
-              <button 
-                class="modal-btn btn-report" 
+              <button
+                class="modal-btn btn-report"
                 @click="goToReport"
                 :disabled="!selectedProject.report_id"
               >
@@ -433,6 +444,29 @@ const goToReport = () => {
       params: { reportId: selectedProject.value.report_id }
     })
     closeModal()
+  }
+}
+
+// Phase 7: Smart resume — compute which step the user should jump to
+// based on how far the project got. Prefers the highest completed artifact.
+const resumeLabel = computed(() => {
+  const p = selectedProject.value
+  if (!p) return ''
+  if (p.report_id) return t('history.step4Button') || 'Report'
+  if (p.simulation_id) return t('history.step2Button') || 'Environment'
+  if (p.project_id) return t('history.step1Button') || 'Graph Build'
+  return '—'
+})
+
+const goToResume = () => {
+  const p = selectedProject.value
+  if (!p) return
+  if (p.report_id) {
+    goToReport()
+  } else if (p.simulation_id) {
+    goToSimulation()
+  } else if (p.project_id) {
+    goToProject()
   }
 }
 
@@ -1254,6 +1288,33 @@ onUnmounted(() => {
   text-transform: uppercase;
   white-space: nowrap;
 }
+
+/* Phase 7: smart resume row */
+.modal-resume-row {
+  padding: 16px 32px 0;
+  background: #FFFFFF;
+}
+.btn-resume {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #DAA520, #f0c050);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-resume:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(218, 165, 32, 0.3);
+}
+.btn-resume .btn-icon { font-size: 1.2rem; }
 
 /* 导航按钮 */
 .modal-actions {

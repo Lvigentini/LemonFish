@@ -51,7 +51,7 @@
       <!-- Right Panel: Step Components -->
       <div class="panel-wrapper right" :style="rightPanelStyle">
         <!-- Step 1: 图谱构建 -->
-        <Step1GraphBuild 
+        <Step1GraphBuild
           v-if="currentStep === 1"
           :currentPhase="currentPhase"
           :projectData="projectData"
@@ -60,6 +60,8 @@
           :graphData="graphData"
           :systemLogs="systemLogs"
           @next-step="handleNextStep"
+          @add-log="addLog"
+          @build-cancelled="handleBuildCancelled"
         />
         <!-- Step 2: 环境搭建 -->
         <Step2EnvSetup
@@ -181,6 +183,12 @@ const handleGoBack = () => {
   }
 }
 
+// Phase 7: child component requested a task cancellation; backend returns
+// CANCELLED on next poll, which is handled by pollTaskStatus. Just log here.
+const handleBuildCancelled = (taskId) => {
+  addLog(`Cancellation requested for task ${taskId}. Stopping at next batch boundary…`)
+}
+
 // --- Data Logic ---
 
 const initProject = async () => {
@@ -277,12 +285,13 @@ const updatePhaseByStatus = (status) => {
 const startBuildGraph = async () => {
   try {
     currentPhase.value = 1
-    buildProgress.value = { progress: 0, message: 'Starting build...' }
+    buildProgress.value = { progress: 0, message: 'Starting build...', task_id: null }
     addLog('Initiating graph build...')
-    
+
     const res = await buildGraph({ project_id: currentProjectId.value })
     if (res.success) {
       addLog(`Graph build task started. Task ID: ${res.data.task_id}`)
+      buildProgress.value = { ...buildProgress.value, task_id: res.data.task_id }
       startGraphPolling()
       startPollingTask(res.data.task_id)
     } else {
@@ -335,20 +344,27 @@ const pollTaskStatus = async (taskId) => {
         addLog(task.message)
       }
       
-      buildProgress.value = { progress: task.progress || 0, message: task.message }
-      
+      buildProgress.value = { progress: task.progress || 0, message: task.message, task_id: taskId }
+
       if (task.status === 'completed') {
         addLog('Graph build task completed.')
         stopPolling()
         stopGraphPolling() // Stop polling, do final load
         currentPhase.value = 2
-        
+
         // Final load
         const projRes = await getProject(currentProjectId.value)
         if (projRes.success && projRes.data.graph_id) {
             projectData.value = projRes.data
             await loadGraph(projRes.data.graph_id)
         }
+      } else if (task.status === 'cancelled') {
+        // Phase 7: task was cancelled by user
+        addLog(`Graph build cancelled: ${task.message}`)
+        stopPolling()
+        stopGraphPolling()
+        error.value = `Cancelled: ${task.message}`
+        buildProgress.value = null
       } else if (task.status === 'failed') {
         stopPolling()
         error.value = task.error

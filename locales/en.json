@@ -75,7 +75,13 @@
     "layoutGraph": "Graph",
     "layoutSplit": "Split",
     "layoutWorkbench": "Workbench",
-    "stepNames": ["Graph Build", "Env Setup", "Run Simulation", "Report Generation", "Deep Interaction"]
+    "stepNames": [
+      "Graph Build",
+      "Env Setup",
+      "Run Simulation",
+      "Report Generation",
+      "Deep Interaction"
+    ]
   },
   "step1": {
     "ontologyGeneration": "Ontology Generation",
@@ -95,7 +101,11 @@
     "creating": "Creating...",
     "enterEnvSetup": "Enter Environment Setup",
     "createSimulationFailed": "Failed to create simulation: {error}",
-    "createSimulationException": "Simulation creation error: {error}"
+    "createSimulationException": "Simulation creation error: {error}",
+    "cancelBuild": "Cancel build",
+    "cancelHint": "Stops at next batch. Progress already made is preserved.",
+    "cancelPending": "Cancellation requested — waiting for next batch boundary…",
+    "cancelConfirm": "Cancel the graph build? Progress already made will be preserved."
   },
   "step2": {
     "simInstanceInit": "Simulation Instance Initialization",
@@ -316,7 +326,8 @@
     "notStarted": "Not started",
     "roundsProgress": "{current}/{total} rounds",
     "untitledSimulation": "Untitled simulation",
-    "unknownFile": "Unknown file"
+    "unknownFile": "Unknown file",
+    "resumeButton": "Resume at"
   },
   "api": {
     "projectNotFound": "Project not found: {id}",

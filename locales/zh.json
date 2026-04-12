@@ -75,7 +75,13 @@
     "layoutGraph": "图谱",
     "layoutSplit": "双栏",
     "layoutWorkbench": "工作台",
-    "stepNames": ["图谱构建", "环境搭建", "开始模拟", "报告生成", "深度互动"]
+    "stepNames": [
+      "图谱构建",
+      "环境搭建",
+      "开始模拟",
+      "报告生成",
+      "深度互动"
+    ]
   },
   "step1": {
     "ontologyGeneration": "本体生成",
@@ -95,7 +101,11 @@
     "creating": "创建中...",
     "enterEnvSetup": "进入环境搭建",
     "createSimulationFailed": "创建模拟失败: {error}",
-    "createSimulationException": "创建模拟异常: {error}"
+    "createSimulationException": "创建模拟异常: {error}",
+    "cancelBuild": "取消构建",
+    "cancelHint": "下一批次时停止。已完成的进度将被保留。",
+    "cancelPending": "已请求取消 — 等待下一批次边界…",
+    "cancelConfirm": "取消图谱构建？已完成的进度将被保留。"
   },
   "step2": {
     "simInstanceInit": "模拟实例初始化",
@@ -316,7 +326,8 @@
     "notStarted": "未开始",
     "roundsProgress": "{current}/{total} 轮",
     "untitledSimulation": "未命名模拟",
-    "unknownFile": "未知文件"
+    "unknownFile": "未知文件",
+    "resumeButton": "继续至"
   },
   "api": {
     "projectNotFound": "项目不存在: {id}",

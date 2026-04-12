@@ -75,7 +75,13 @@
     "layoutGraph": "Grafo",
     "layoutSplit": "Diviso",
     "layoutWorkbench": "Workbench",
-    "stepNames": ["Costruzione del Grafo", "Configurazione Ambiente", "Esegui Simulazione", "Generazione Report", "Interazione Approfondita"]
+    "stepNames": [
+      "Costruzione del Grafo",
+      "Configurazione Ambiente",
+      "Esegui Simulazione",
+      "Generazione Report",
+      "Interazione Approfondita"
+    ]
   },
   "step1": {
     "ontologyGeneration": "Generazione dell'Ontologia",
@@ -95,7 +101,11 @@
     "creating": "Creazione...",
     "enterEnvSetup": "Configura Ambiente",
     "createSimulationFailed": "Impossibile creare la simulazione: {error}",
-    "createSimulationException": "Errore nella creazione della simulazione: {error}"
+    "createSimulationException": "Errore nella creazione della simulazione: {error}",
+    "cancelBuild": "Annulla costruzione",
+    "cancelHint": "Si ferma al prossimo batch. Il progresso già fatto viene preservato.",
+    "cancelPending": "Annullamento richiesto — in attesa del prossimo confine di batch…",
+    "cancelConfirm": "Annullare la costruzione del grafo? Il progresso già fatto verrà preservato."
   },
   "step2": {
     "simInstanceInit": "Inizializzazione dell'Istanza di Simulazione",
@@ -316,7 +326,8 @@
     "notStarted": "Non avviato",
     "roundsProgress": "{current}/{total} turni",
     "untitledSimulation": "Simulazione senza titolo",
-    "unknownFile": "File sconosciuto"
+    "unknownFile": "File sconosciuto",
+    "resumeButton": "Riprendi da"
   },
   "api": {
     "projectNotFound": "Progetto non trovato: {id}",
