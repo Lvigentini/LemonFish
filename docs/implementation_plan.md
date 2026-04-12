@@ -36,7 +36,7 @@ These are the changes live on `main` as of v0.2.0.
 
 ---
 
-## Phase 1 — Provider Catalogue Sync (v0.3.0 target)
+## Phase 1 — Provider Catalogue Sync (v0.3.0 target) ✅ SHIPPED
 
 **Goal:** Bring `setup.sh` and in-code defaults in line with the current verified provider catalogue in [`docs/llm_providers.md`](./llm_providers.md).
 
@@ -44,17 +44,19 @@ These are the changes live on `main` as of v0.2.0.
 
 ### Tasks
 
-| # | Task | File | Priority |
-|---|------|------|----------|
-| 1.1 | Update Anthropic default to `claude-sonnet-4-6` | `setup.sh:82` | High |
-| 1.2 | Update Grok default to `grok-4-1-fast-non-reasoning` | `setup.sh:91` | High |
-| 1.3 | Consider OpenAI default: `gpt-5-nano` or `gpt-4.1-nano` | `setup.sh:58` | Medium |
-| 1.4 | Add Groq as first-class wizard option | `setup.sh` | High |
-| 1.5 | Add Ollama as first-class wizard option | `setup.sh` | High |
-| 1.6 | Update DeepSeek pricing in docs | `docs/llm_budget_planning.md` | Low (done above) |
-| 1.7 | Replace `gemma2-9b-it` Groq refs with current Groq lineup | `docs/llm_budget_planning.md` | Low (done above) |
-| 1.8 | Update default Gemini model to `gemini-3-flash-preview` in setup wizard | `setup.sh` | Medium |
-| 1.9 | Fix fallback chain in `.env.example` (remove `gemma-4-31b-it:free` which returned 404 earlier) | `.env.example` | Medium |
+| # | Task | File | Status |
+|---|------|------|--------|
+| 1.1 | Update Anthropic default to `claude-sonnet-4-6` | `setup.sh` | ✅ |
+| 1.2 | Update Grok default to `grok-4-1-fast-non-reasoning` | `setup.sh` | ✅ |
+| 1.3 | OpenAI default: `gpt-5-nano` | `setup.sh` | ✅ |
+| 1.4 | Add Groq as first-class wizard option | `setup.sh` | ✅ |
+| 1.5 | Add Ollama as first-class wizard option (skips API key prompt) | `setup.sh` | ✅ |
+| 1.6 | Update DeepSeek pricing in docs | `docs/llm_budget_planning.md` | ✅ |
+| 1.7 | Replace stale Groq models with current lineup | `docs/llm_budget_planning.md` | ✅ |
+| 1.8 | Update default Gemini model to `gemini-3-flash-preview` | `setup.sh` | ✅ |
+| 1.9 | Replace stale OpenRouter `gemma-4-31b-it:free` with `llama-3.3-70b-instruct:free` default | `setup.sh` | ✅ |
+| 1.10 | Rewrite `.env.example` in English with current provider examples | `.env.example` | ✅ |
+| 1.11 | Update Qwen default to `qwen-flash` (cheapest tier) | `setup.sh` | ✅ |
 
 ### Acceptance
 
@@ -274,8 +276,8 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
 
 | Version | Contents | Estimated phases |
 |---------|----------|------------------|
-| v0.2.0 (current) | Phase 0 | ✅ |
-| v0.3.0 | Phase 1 (catalogue sync) + a few QoL | 📋 |
+| v0.2.0 | Phase 0 | ✅ |
+| v0.3.0 (current) | Phase 1 (catalogue sync) | ✅ |
 | v0.4.0 | Phase 2 (step routing) | 📋 |
 | v0.5.0 | Phase 3 (token tracking) | 📋 |
 | v0.6.0 | Phase 4 (budget allocator) | 📋 |

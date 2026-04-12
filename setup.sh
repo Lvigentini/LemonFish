@@ -30,15 +30,17 @@ echo ""
 echo "┌─────────────────────────────────────────────────┐"
 echo "│ Step 1: LLM Provider                            │"
 echo "├─────────────────────────────────────────────────┤"
-echo "│ 1) OpenRouter (free models available)           │"
-echo "│ 2) OpenAI                                       │"
-echo "│ 3) Google Gemini (generous free tier)           │"
-echo "│ 4) DeepSeek (cheapest paid)                     │"
-echo "│ 5) Anthropic Claude                             │"
-echo "│ 6) Grok (xAI)                                  │"
-echo "│ 7) Alibaba DashScope / Qwen                    │"
-echo "│ 8) Kimi / Moonshot                             │"
-echo "│ 9) Custom (enter your own base URL)             │"
+echo "│  1) OpenRouter (free models available)          │"
+echo "│  2) OpenAI                                      │"
+echo "│  3) Google Gemini (generous free tier)          │"
+echo "│  4) Groq (fast free tier, renewable daily)      │"
+echo "│  5) DeepSeek (very cheap paid)                  │"
+echo "│  6) Anthropic Claude                            │"
+echo "│  7) Grok (xAI)                                  │"
+echo "│  8) Alibaba DashScope / Qwen                    │"
+echo "│  9) Kimi / Moonshot                             │"
+echo "│ 10) Ollama (local, no API key needed)           │"
+echo "│ 11) Custom (enter your own base URL)            │"
 echo "└─────────────────────────────────────────────────┘"
 printf "Select provider [1]: "
 read -r PROVIDER_CHOICE
@@ -47,62 +49,70 @@ PROVIDER_CHOICE=${PROVIDER_CHOICE:-1}
 case "$PROVIDER_CHOICE" in
     1)
         LLM_BASE_URL="https://openrouter.ai/api/v1"
-        DEFAULT_MODEL="google/gemma-4-31b-it:free"
-        FALLBACK_MODELS="meta-llama/llama-3.3-70b-instruct:free,nousresearch/hermes-3-llama-3.1-405b:free,nvidia/nemotron-3-super-120b-a12b:free,openrouter/free"
+        DEFAULT_MODEL="meta-llama/llama-3.3-70b-instruct:free"
+        FALLBACK_MODELS="nousresearch/hermes-3-llama-3.1-405b:free,qwen/qwen3-235b-a22b:free,deepseek/deepseek-chat:free,openrouter/free"
         echo ""
         echo "  OpenRouter selected. Free models available."
         echo "  Get your API key at: https://openrouter.ai/keys"
         ;;
     2)
         LLM_BASE_URL="https://api.openai.com/v1"
-        DEFAULT_MODEL="gpt-4o-mini"
+        DEFAULT_MODEL="gpt-5-nano"
         FALLBACK_MODELS=""
         echo ""
-        echo "  OpenAI selected."
+        echo "  OpenAI selected (default: gpt-5-nano, cheapest tier)."
         echo "  Get your API key at: https://platform.openai.com/api-keys"
         ;;
     3)
         LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/"
-        DEFAULT_MODEL="gemini-2.5-flash"
+        DEFAULT_MODEL="gemini-3-flash-preview"
         FALLBACK_MODELS=""
         echo ""
-        echo "  Google Gemini selected."
+        echo "  Google Gemini selected (default: gemini-3-flash-preview, 1M context)."
         echo "  Get your API key at: https://aistudio.google.com/apikey"
         ;;
     4)
+        LLM_BASE_URL="https://api.groq.com/openai/v1"
+        DEFAULT_MODEL="llama-3.1-8b-instant"
+        FALLBACK_MODELS="qwen/qwen3-32b,moonshotai/kimi-k2-instruct,openai/gpt-oss-20b,openai/gpt-oss-120b"
+        echo ""
+        echo "  Groq selected (default: llama-3.1-8b-instant, 500K tokens/day free)."
+        echo "  Get your API key at: https://console.groq.com/keys"
+        ;;
+    5)
         LLM_BASE_URL="https://api.deepseek.com/v1"
         DEFAULT_MODEL="deepseek-chat"
         FALLBACK_MODELS=""
         echo ""
-        echo "  DeepSeek selected."
+        echo "  DeepSeek selected (\$0.28/M input, \$0.42/M output)."
         echo "  Get your API key at: https://platform.deepseek.com/api_keys"
         ;;
-    5)
+    6)
         LLM_BASE_URL="https://api.anthropic.com/v1/"
-        DEFAULT_MODEL="claude-sonnet-4-20250514"
+        DEFAULT_MODEL="claude-sonnet-4-6"
         FALLBACK_MODELS=""
         echo ""
-        echo "  Anthropic Claude selected."
+        echo "  Anthropic Claude selected (default: claude-sonnet-4-6)."
         echo "  Note: may not support response_format (JSON mode)."
         echo "  Get your API key at: https://console.anthropic.com/settings/keys"
         ;;
-    6)
+    7)
         LLM_BASE_URL="https://api.x.ai/v1"
-        DEFAULT_MODEL="grok-3-mini"
+        DEFAULT_MODEL="grok-4-1-fast-non-reasoning"
         FALLBACK_MODELS=""
         echo ""
         echo "  Grok (xAI) selected."
         echo "  Get your API key at: https://console.x.ai"
         ;;
-    7)
+    8)
         LLM_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
-        DEFAULT_MODEL="qwen-plus"
+        DEFAULT_MODEL="qwen-flash"
         FALLBACK_MODELS=""
         echo ""
-        echo "  Alibaba DashScope selected."
+        echo "  Alibaba DashScope selected (default: qwen-flash, \$0.05/M input)."
         echo "  Get your API key at: https://bailian.console.aliyun.com/"
         ;;
-    8)
+    9)
         LLM_BASE_URL="https://api.moonshot.cn/v1"
         DEFAULT_MODEL="moonshot-v1-8k"
         FALLBACK_MODELS=""
@@ -110,7 +120,17 @@ case "$PROVIDER_CHOICE" in
         echo "  Kimi / Moonshot selected."
         echo "  Get your API key at: https://platform.moonshot.cn/console/api-keys"
         ;;
-    9)
+    10)
+        LLM_BASE_URL="http://host.docker.internal:11434/v1"
+        DEFAULT_MODEL="llama3.2"
+        FALLBACK_MODELS=""
+        echo ""
+        echo "  Ollama selected. Make sure Ollama is running on the host with at least one model pulled."
+        echo "  Install Ollama: https://ollama.com/download"
+        echo "  Pull a model:  ollama pull llama3.2 (or gemma2:9b, qwen2.5, etc.)"
+        echo "  Note: API key will be set to 'ollama' (Ollama does not require one)."
+        ;;
+    11)
         printf "  Enter base URL: "
         read -r LLM_BASE_URL
         DEFAULT_MODEL=""
@@ -119,18 +139,23 @@ case "$PROVIDER_CHOICE" in
     *)
         echo "Invalid choice. Defaulting to OpenRouter."
         LLM_BASE_URL="https://openrouter.ai/api/v1"
-        DEFAULT_MODEL="google/gemma-4-31b-it:free"
-        FALLBACK_MODELS="meta-llama/llama-3.3-70b-instruct:free,nousresearch/hermes-3-llama-3.1-405b:free,nvidia/nemotron-3-super-120b-a12b:free,openrouter/free"
+        DEFAULT_MODEL="meta-llama/llama-3.3-70b-instruct:free"
+        FALLBACK_MODELS="nousresearch/hermes-3-llama-3.1-405b:free,qwen/qwen3-235b-a22b:free,deepseek/deepseek-chat:free,openrouter/free"
         ;;
 esac
 
 echo ""
-printf "Enter your LLM API key: "
-read -r LLM_API_KEY
+if [ "$PROVIDER_CHOICE" = "10" ]; then
+    LLM_API_KEY="ollama"
+    echo "Using 'ollama' as API key placeholder (Ollama does not require one)."
+else
+    printf "Enter your LLM API key: "
+    read -r LLM_API_KEY
 
-if [ -z "$LLM_API_KEY" ]; then
-    echo "ERROR: API key is required."
-    exit 1
+    if [ -z "$LLM_API_KEY" ]; then
+        echo "ERROR: API key is required."
+        exit 1
+    fi
 fi
 
 printf "Model name [%s]: " "$DEFAULT_MODEL"
