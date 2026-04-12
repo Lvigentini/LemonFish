@@ -62,6 +62,7 @@
           @next-step="handleNextStep"
           @add-log="addLog"
           @build-cancelled="handleBuildCancelled"
+          @retry-build="handleRetryBuild"
         />
         <!-- Step 2: 环境搭建 -->
         <Step2EnvSetup
@@ -187,6 +188,16 @@ const handleGoBack = () => {
 // CANCELLED on next poll, which is handled by pollTaskStatus. Just log here.
 const handleBuildCancelled = (taskId) => {
   addLog(`Cancellation requested for task ${taskId}. Stopping at next batch boundary…`)
+}
+
+// Phase 7: retry a failed/cancelled graph build. Project was already reset
+// by the child component — we just need to trigger a fresh build.
+const handleRetryBuild = async () => {
+  error.value = null
+  currentPhase.value = 0
+  buildProgress.value = null
+  addLog('[retry] Starting new graph build from existing ontology…')
+  await startBuildGraph()
 }
 
 // --- Data Logic ---
@@ -344,7 +355,13 @@ const pollTaskStatus = async (taskId) => {
         addLog(task.message)
       }
       
-      buildProgress.value = { progress: task.progress || 0, message: task.message, task_id: taskId }
+      buildProgress.value = {
+        progress: task.progress || 0,
+        message: task.message,
+        task_id: taskId,
+        progress_detail: task.progress_detail || null,
+        status: task.status,
+      }
 
       if (task.status === 'completed') {
         addLog('Graph build task completed.')

@@ -105,7 +105,13 @@
     "cancelBuild": "Annulla costruzione",
     "cancelHint": "Si ferma al prossimo batch. Il progresso già fatto viene preservato.",
     "cancelPending": "Annullamento richiesto — in attesa del prossimo confine di batch…",
-    "cancelConfirm": "Annullare la costruzione del grafo? Il progresso già fatto verrà preservato."
+    "cancelConfirm": "Annullare la costruzione del grafo? Il progresso già fatto verrà preservato.",
+    "batchProgress": "Progresso del batch",
+    "retryTitle": "Costruzione fallita o annullata",
+    "retryHint": "Riprova avvia una nuova costruzione dall'ontologia esistente. I dati del grafo precedenti saranno scartati.",
+    "retryBuild": "Riprova costruzione",
+    "retrying": "Riprovando…",
+    "retryConfirm": "Riprovare la costruzione del grafo da zero? Qualsiasi dato parziale del grafo sarà scartato."
   },
   "step2": {
     "simInstanceInit": "Inizializzazione dell'Istanza di Simulazione",

@@ -105,7 +105,13 @@
     "cancelBuild": "Cancel build",
     "cancelHint": "Stops at next batch. Progress already made is preserved.",
     "cancelPending": "Cancellation requested — waiting for next batch boundary…",
-    "cancelConfirm": "Cancel the graph build? Progress already made will be preserved."
+    "cancelConfirm": "Cancel the graph build? Progress already made will be preserved.",
+    "batchProgress": "Batch progress",
+    "retryTitle": "Build failed or cancelled",
+    "retryHint": "Retry starts a new build from the existing ontology. Prior graph data will be discarded.",
+    "retryBuild": "Retry build",
+    "retrying": "Retrying…",
+    "retryConfirm": "Retry the graph build from scratch? Any partial graph data will be discarded."
   },
   "step2": {
     "simInstanceInit": "Simulation Instance Initialization",

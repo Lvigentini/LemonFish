@@ -105,7 +105,13 @@
     "cancelBuild": "Annuler la construction",
     "cancelHint": "S'arrête au prochain lot. La progression déjà effectuée est préservée.",
     "cancelPending": "Annulation demandée — en attente de la prochaine limite de lot…",
-    "cancelConfirm": "Annuler la construction du graphe ? La progression déjà effectuée sera préservée."
+    "cancelConfirm": "Annuler la construction du graphe ? La progression déjà effectuée sera préservée.",
+    "batchProgress": "Progression du lot",
+    "retryTitle": "Construction échouée ou annulée",
+    "retryHint": "Réessayer démarre une nouvelle construction à partir de l'ontologie existante. Les données du graphe précédentes seront supprimées.",
+    "retryBuild": "Réessayer la construction",
+    "retrying": "Nouvelle tentative…",
+    "retryConfirm": "Réessayer la construction du graphe depuis le début ? Toutes les données partielles du graphe seront supprimées."
   },
   "step2": {
     "simInstanceInit": "Initialisation de l'instance de simulation",

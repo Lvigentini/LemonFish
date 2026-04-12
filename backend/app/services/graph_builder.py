@@ -337,10 +337,22 @@ class GraphBuilderService:
 
             if progress_callback:
                 progress = (i + len(batch_chunks)) / total_chunks
-                progress_callback(
-                    t('progress.sendingBatch', current=batch_num, total=total_batches, chunks=len(batch_chunks)),
-                    progress
-                )
+                # Phase 7: pass batch detail as kwargs; callback can ignore them
+                # if it doesn't care about per-batch granularity.
+                try:
+                    progress_callback(
+                        t('progress.sendingBatch', current=batch_num, total=total_batches, chunks=len(batch_chunks)),
+                        progress,
+                        current_batch=batch_num,
+                        total_batches=total_batches,
+                        completed_batches=batch_num - 1,  # batches fully done before this one
+                    )
+                except TypeError:
+                    # Legacy callback that doesn't accept kwargs — fall back to 2-arg form
+                    progress_callback(
+                        t('progress.sendingBatch', current=batch_num, total=total_batches, chunks=len(batch_chunks)),
+                        progress
+                    )
 
             # 构建episode数据
             episodes = [

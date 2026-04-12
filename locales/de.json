@@ -105,7 +105,13 @@
     "cancelBuild": "Build abbrechen",
     "cancelHint": "Stoppt beim nächsten Batch. Bereits erzielter Fortschritt bleibt erhalten.",
     "cancelPending": "Abbruch angefordert — warte auf nächste Batch-Grenze…",
-    "cancelConfirm": "Graph-Build abbrechen? Bereits erzielter Fortschritt bleibt erhalten."
+    "cancelConfirm": "Graph-Build abbrechen? Bereits erzielter Fortschritt bleibt erhalten.",
+    "batchProgress": "Batch-Fortschritt",
+    "retryTitle": "Build fehlgeschlagen oder abgebrochen",
+    "retryHint": "Erneuter Versuch startet einen neuen Build aus der vorhandenen Ontologie. Vorherige Graph-Daten werden verworfen.",
+    "retryBuild": "Build wiederholen",
+    "retrying": "Wiederhole…",
+    "retryConfirm": "Graph-Build von Grund auf wiederholen? Alle Teildaten des Graphen werden verworfen."
   },
   "step2": {
     "simInstanceInit": "Initialisierung der Simulationsinstanz",

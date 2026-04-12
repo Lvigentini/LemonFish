@@ -105,7 +105,13 @@
     "cancelBuild": "Cancelar construcción",
     "cancelHint": "Se detiene en el próximo lote. El progreso ya realizado se conserva.",
     "cancelPending": "Cancelación solicitada — esperando el límite del próximo lote…",
-    "cancelConfirm": "¿Cancelar la construcción del grafo? El progreso ya realizado se conservará."
+    "cancelConfirm": "¿Cancelar la construcción del grafo? El progreso ya realizado se conservará.",
+    "batchProgress": "Progreso del lote",
+    "retryTitle": "Construcción fallida o cancelada",
+    "retryHint": "Reintentar inicia una nueva construcción desde la ontología existente. Los datos previos del grafo se descartarán.",
+    "retryBuild": "Reintentar construcción",
+    "retrying": "Reintentando…",
+    "retryConfirm": "¿Reintentar la construcción del grafo desde cero? Cualquier dato parcial del grafo se descartará."
   },
   "step2": {
     "simInstanceInit": "Inicialización de Instancia de Simulación",

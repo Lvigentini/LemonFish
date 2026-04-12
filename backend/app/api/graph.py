@@ -438,13 +438,22 @@ def build_graph():
                 )
                 builder.set_ontology(graph_id, ontology)
                 
-                # 添加文本（progress_callback 签名是 (msg, progress_ratio)）
-                def add_progress_callback(msg, progress_ratio):
+                # 添加文本（progress_callback 签名是 (msg, progress_ratio, **kwargs)）
+                # Phase 7: capture batch-level progress in progress_detail
+                def add_progress_callback(msg, progress_ratio, **kwargs):
                     progress = 15 + int(progress_ratio * 40)  # 15% - 55%
+                    detail = {}
+                    if 'current_batch' in kwargs:
+                        detail['current_batch'] = kwargs['current_batch']
+                    if 'total_batches' in kwargs:
+                        detail['total_batches'] = kwargs['total_batches']
+                    if 'completed_batches' in kwargs:
+                        detail['completed_batches'] = kwargs['completed_batches']
                     task_manager.update_task(
                         task_id,
                         message=msg,
-                        progress=progress
+                        progress=progress,
+                        progress_detail=detail if detail else None,
                     )
                 
                 task_manager.update_task(

@@ -80,3 +80,15 @@ export function cancelTask(taskId) {
     method: 'post'
   })
 }
+
+/**
+ * Phase 7: reset a project back to ontology_generated state so graph build
+ * can be retried. Clears graph_id, graph_build_task_id, and error fields.
+ * @param {String} projectId
+ */
+export function resetProject(projectId) {
+  return service({
+    url: `/api/graph/project/${projectId}/reset`,
+    method: 'post'
+  })
+}

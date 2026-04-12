@@ -114,7 +114,10 @@
           </div>
           <div class="step-status">
             <span v-if="currentPhase > 1" class="badge success">{{ $t('step1.ontologyCompleted') }}</span>
-            <span v-else-if="currentPhase === 1" class="badge processing">{{ buildProgress?.progress || 0 }}%</span>
+            <span v-else-if="currentPhase === 1" class="badge processing">
+              {{ buildProgress?.progress || 0 }}%
+              <span v-if="batchCountLabel" class="batch-label">· {{ batchCountLabel }}</span>
+            </span>
             <span v-else class="badge pending">{{ $t('step1.ontologyPending') }}</span>
           </div>
         </div>
@@ -141,6 +144,16 @@
             </div>
           </div>
 
+          <!-- Batch progress detail (Phase 7) -->
+          <div v-if="currentPhase === 1 && batchCountLabel" class="batch-detail">
+            <div class="batch-bar">
+              <div class="batch-bar-fill" :style="{ width: batchPercent + '%' }"></div>
+            </div>
+            <div class="batch-detail-text">
+              {{ $t('step1.batchProgress') || 'Batch progress' }}: {{ batchCountLabel }}
+            </div>
+          </div>
+
           <!-- Cancel button (Phase 7 — only while build is running) -->
           <div v-if="currentPhase === 1 && !cancelling" class="cancel-row">
             <button class="cancel-btn" @click="handleCancelBuild">
@@ -150,6 +163,18 @@
           </div>
           <div v-if="cancelling" class="cancel-row">
             <span class="cancel-pending">{{ $t('step1.cancelPending') || 'Cancellation requested — waiting for next batch boundary…' }}</span>
+          </div>
+
+          <!-- Retry button (Phase 7 — shown when a previous build failed or was cancelled) -->
+          <div v-if="showRetry" class="retry-row">
+            <div class="retry-info">
+              <strong>{{ $t('step1.retryTitle') || 'Build failed or cancelled' }}</strong>
+              <span class="retry-hint">{{ $t('step1.retryHint') || 'Retry starts a new build from the existing ontology. Prior graph data will be discarded.' }}</span>
+            </div>
+            <button class="retry-btn" @click="handleRetryBuild" :disabled="retrying">
+              <span v-if="retrying" class="spinner-sm"></span>
+              ↻ {{ retrying ? ($t('step1.retrying') || 'Retrying…') : ($t('step1.retryBuild') || 'Retry build') }}
+            </button>
           </div>
         </div>
       </div>
@@ -202,7 +227,7 @@ import { computed, ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { createSimulation } from '../api/simulation'
-import { cancelTask } from '../api/graph'
+import { cancelTask, resetProject, buildGraph } from '../api/graph'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -216,12 +241,39 @@ const props = defineProps({
   systemLogs: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['next-step', 'build-cancelled', 'add-log'])
+const emit = defineEmits(['next-step', 'build-cancelled', 'add-log', 'retry-build'])
 
 const selectedOntologyItem = ref(null)
 const logContent = ref(null)
 const creatingSimulation = ref(false)
 const cancelling = ref(false)
+const retrying = ref(false)
+
+// Phase 7: Batch-level progress from buildProgress.progress_detail
+const batchCountLabel = computed(() => {
+  const detail = props.buildProgress?.progress_detail
+  if (!detail?.total_batches) return null
+  const current = detail.current_batch ?? detail.completed_batches ?? 0
+  return `${current}/${detail.total_batches}`
+})
+
+const batchPercent = computed(() => {
+  const detail = props.buildProgress?.progress_detail
+  if (!detail?.total_batches) return 0
+  const current = detail.current_batch ?? detail.completed_batches ?? 0
+  return Math.round((current / detail.total_batches) * 100)
+})
+
+// Phase 7: Retry button visibility — shown when a build has failed or been cancelled
+// and the project still has an ontology we can rebuild from.
+const showRetry = computed(() => {
+  if (props.currentPhase === 2) return false  // already done
+  if (props.currentPhase === 1) return false  // running
+  // currentPhase is 0 or something else — check if we have an ontology + an error signal
+  const hasOntology = !!props.projectData?.ontology || props.currentPhase >= 0
+  const hadFailure = props.projectData?.status === 'failed' || props.buildProgress?.status === 'failed' || props.buildProgress?.status === 'cancelled'
+  return hasOntology && hadFailure
+})
 
 // Phase 7: cancel a running graph build at the next batch boundary
 const handleCancelBuild = async () => {
@@ -249,6 +301,31 @@ const handleCancelBuild = async () => {
 watch(() => props.currentPhase, (phase) => {
   if (phase !== 1) cancelling.value = false
 })
+
+// Phase 7: Retry a failed/cancelled graph build
+const handleRetryBuild = async () => {
+  const projectId = props.projectData?.project_id
+  if (!projectId) {
+    console.error('No project_id to retry')
+    return
+  }
+  if (!confirm(t('step1.retryConfirm') || 'Retry the graph build from scratch? Any partial graph data will be discarded.')) {
+    return
+  }
+  retrying.value = true
+  try {
+    emit('add-log', `[retry] Resetting project ${projectId}…`)
+    await resetProject(projectId)
+    emit('add-log', `[retry] Starting new graph build…`)
+    // Notify parent to re-start the build polling
+    emit('retry-build')
+  } catch (e) {
+    console.error('Retry failed:', e)
+    alert('Retry failed: ' + (e?.message || e))
+  } finally {
+    retrying.value = false
+  }
+}
 
 // 进入环境搭建 - 创建 simulation 并跳转
 const handleEnterEnvSetup = async () => {
@@ -771,5 +848,87 @@ watch(() => props.systemLogs.length, () => {
   color: #facc15;
   font-size: 0.8rem;
   font-style: italic;
+}
+
+/* Phase 7: batch progress detail */
+.batch-label {
+  font-size: 0.72rem;
+  opacity: 0.75;
+  font-weight: 500;
+  margin-left: 2px;
+}
+.batch-detail {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(218, 165, 32, 0.05);
+  border: 1px solid rgba(218, 165, 32, 0.2);
+  border-radius: 6px;
+}
+.batch-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.batch-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #DAA520, #f0c050);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.batch-detail-text {
+  color: #aaa;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+/* Phase 7: retry button */
+.retry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(248, 113, 113, 0.06);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  border-radius: 8px;
+}
+.retry-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.retry-info strong {
+  color: #f87171;
+  font-size: 0.85rem;
+}
+.retry-hint {
+  color: #888;
+  font-size: 0.72rem;
+}
+.retry-btn {
+  background: #DAA520;
+  color: #000;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.retry-btn:hover:not(:disabled) {
+  background: #f0c050;
+  transform: translateY(-1px);
+}
+.retry-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 </style>

@@ -105,7 +105,13 @@
     "cancelBuild": "取消构建",
     "cancelHint": "下一批次时停止。已完成的进度将被保留。",
     "cancelPending": "已请求取消 — 等待下一批次边界…",
-    "cancelConfirm": "取消图谱构建？已完成的进度将被保留。"
+    "cancelConfirm": "取消图谱构建？已完成的进度将被保留。",
+    "batchProgress": "批次进度",
+    "retryTitle": "构建失败或已取消",
+    "retryHint": "重试将从现有本体重新开始构建。之前的图谱数据将被丢弃。",
+    "retryBuild": "重试构建",
+    "retrying": "正在重试…",
+    "retryConfirm": "从头开始重试图谱构建？任何部分图谱数据都将被丢弃。"
   },
   "step2": {
     "simInstanceInit": "模拟实例初始化",

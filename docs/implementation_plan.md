@@ -298,6 +298,73 @@ Backlog items that are self-contained and can be picked up anytime.
 
 ---
 
+## Phase 8 — Research-From-Prompt Add-On Module (v0.10.0 target)
+
+**Goal:** Replace the hard requirement to upload curated documents with an optional research-from-prompt entry point. The user provides a vague intent ("predict EV truck adoption in EU haulage 2026-2030"), the system orchestrates several research agents in parallel via web search, and the compiled output feeds the existing Step 1 → 5 pipeline unchanged.
+
+**Why now:** With Phases 1-7 shipped, the platform has every primitive this feature needs — per-step LLM routing (Phase 2), token tracking (Phase 3), provider pool with allocation (Phase 4), capability detection for synthesis JSON output (Phase 5), task cancellation + orphan cleanup (Phase 7). Building this earlier would have meant duplicating those primitives.
+
+**Architecture summary** (full design: [`docs/new_features_planning.md#feature-research-from-prompt-add-on-module`](./new_features_planning.md)):
+
+- **Add-on module** at `backend/research/` — own Flask blueprint, conditionally registered. Main app starts unchanged when disabled or absent.
+- **Plug-in seam**: research output is written to `uploads/projects/{project_id}/extracted_text.txt` and the project is promoted to `ONTOLOGY_GENERATED`-ready. The existing `OntologyGenerator` consumes it as if it were uploaded text. **No changes to Step 1-5 code paths.**
+- **Three-phase orchestrator**: Plan (1 LLM call decomposes prompt into 3-8 sub-topics) → Research (ThreadPoolExecutor fans out to N runners in parallel) → Synthesise (1 LLM call merges summaries with citations).
+- **Runner abstraction** with 4 implementations: `claude_runner.py`, `codex_runner.py`, `kimi_runner.py` (subprocess wrappers around the user's locally-installed CLIs, using their cached OAuth credentials and built-in web search), and `api_runner.py` (fallback using `LLMClient` + `duckduckgo-search`).
+- **Pre-flight availability probe**: frontend hits `/api/research/availability` to detect which CLIs are installed and authenticated, then surfaces an explicit picker. No silent fallback.
+- **Step 0 frontend**: new optional step before existing Step 1. Home view gets a second "Start with research" entry point alongside "Upload documents".
+
+### Tasks
+
+| # | Task | File | Priority |
+|---|------|------|----------|
+| 8.A | Module scaffold: `backend/research/` skeleton, `__init__.py`, conditional mount in `backend/app/__init__.py`, `RESEARCH_ENABLED` config, `/health` endpoint | new module + `app/__init__.py` | High |
+| 8.B | `models.py`: `ResearchTask`, `SubTopic`, `ResearchSummary` dataclasses. Reuse `TaskManager` for tracking. Persist state to `uploads/research/{task_id}/state.json` | new | High |
+| 8.C | `runners/api_runner.py` + `search/ddg.py`: fallback runner using existing `LLMClient` + DuckDuckGo. No CLI dependency. | new | High |
+| 8.D | `orchestrator.py`: Plan → Research → Synthesise loop. ThreadPoolExecutor for parallel sub-topics. Per-phase routing via `Config.get_step_llm_config('research_plan')` and `('research_synthesis')` | new | High |
+| 8.E | `availability.py`: probe `claude` / `codex` / `kimi` on PATH + auth status. Return structured `{name, available, auth, reason}` per runner | new | High |
+| 8.F | `runners/claude_runner.py`: Claude Code CLI subprocess wrapper. Verify flags via `claude --help` first | new | Medium |
+| 8.G | `runners/codex_runner.py`: OpenAI Codex CLI wrapper. Verify flags first | new | Medium |
+| 8.H | `runners/kimi_runner.py`: Kimi CLI wrapper. Verify availability + flags first | new | Medium |
+| 8.I | Frontend Step 0: `Step0Research.vue`, `ResearchSetup.vue`, `ResearchProgress.vue`, `ResearchPreview.vue`, `api/research.js`, router entry, Home.vue button, locale strings × 8 | frontend | High |
+| 8.J | `docker-compose.research.yml` overlay mounting `~/.claude`, `~/.codex`, `~/.config/kimi` read-only. `setup.sh` opt-in prompt. Documentation. | new + setup.sh + docs | Medium |
+| 8.K | `docs/research_module.md` user guide; update `docs/ARCHITECTURE.md` with module section | docs | Low |
+
+### Reuses from earlier phases
+
+| Phase 8 needs | Provided by | File |
+|---------------|-------------|------|
+| Per-step LLM routing for Plan + Synthesise phases | Phase 2 | `Config.get_step_llm_config()` in `backend/app/config.py` |
+| Token tracking for research-phase consumption | Phase 3 | `TokenTracker` thread-local context |
+| Provider capability detection (synthesis needs JSON) | Phase 5 | `LLMClient.chat_json` auto-fallback |
+| Background task lifecycle + cancellation | Phase 7 | `TaskManager` + cancel events |
+| Orphan project cleanup if research fails partway | Phase 7 | existing cleanup hook in graph API |
+| ThreadPoolExecutor pattern for parallel work | Phase 0 (already present) | `oasis_profile_generator.py` |
+| Subprocess + monitor thread pattern | Phase 0 (already present) | `simulation_runner.py` |
+
+### Risks
+
+- **CLI invocation flags**: each tool's unattended-mode flags must be verified via `--help` before writing the runner. Failed runners fall back to ApiRunner cleanly.
+- **Subprocess env leakage**: pass an explicit minimal env dict to `subprocess.Popen` (only `PATH`, `HOME`, CLI's own config dir) to avoid leaking `LLM_API_KEY` etc into the CLI tool's context.
+- **Output parsing**: CLIs print prose, not JSON. System prompt instructs runners to emit `=== SUMMARY ===` and `=== SOURCES ===` blocks; orchestrator captures all stdout regardless and treats cleaned text as the summary.
+- **Docker volume mounts on Windows**: document Linux/macOS as primary; Windows users use API fallback or WSL.
+- **`duckduckgo-search` reliability**: pin a version. If DDG breaks, swap for `tavily-python` (paid but reliable).
+
+### Acceptance
+
+- With `RESEARCH_ENABLED=false`, app starts unchanged and `/api/research/*` returns 404
+- With `RESEARCH_ENABLED=true` and `RESEARCH_RUNNERS=api`, end-to-end research → compiled doc → Step 1 ontology generation works on a host with no CLI tools installed
+- With Claude Code CLI installed locally, research using `runner_choice=claude` produces a compiled document with citations
+- Pre-flight `/api/research/availability` correctly reports installed/uninstalled CLIs with reasons
+- Docker overlay (`docker-compose.research.yml`) lets the slim image use the host's CLI configs for research
+- Token usage from research phase is recorded under simulation `research_plan` and `research_synthesis` step labels
+- Cancel button works during all three phases (Plan, Research, Synthesise)
+
+### Plan reference
+
+Detailed implementation steps and verification: `/Users/lor/.claude/plans/temporal-shimmying-moore.md` (plan file from the planning session).
+
+---
+
 ## Not Doing (Explicit rejections)
 
 | Idea | Why rejected |
@@ -324,6 +391,11 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
                                                          │
                                                          ▼
                                                   Phase 5 (capability detection)  ──►  Phase 6 (multi-model personas)
+                                                                                              │
+                                                                                              ▼
+                                                                                       Phase 8 (research-from-prompt)
+                                                                                       (independent — can ship anytime
+                                                                                        after Phases 2, 3, 5, 7)
 ```
 
 ---
@@ -340,6 +412,7 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
 | v0.7.0 | Phase 5 (capability detection) | ✅ |
 | v0.8.0 | Phase 6 (multi-model personas) | ✅ |
 | v0.9.0 (current) | Phase 7 (QoL: pre-flight modal, cancel, orphan cleanup) | ✅ |
+| v0.10.0 | Phase 8 (research-from-prompt add-on module) | 📋 next |
 | v1.0.0 | Full feature set, stable API + live end-to-end tested | 💡 |
 
 Versions are indicative, not deadlines. Features may ship sooner if they unlock testable value.
