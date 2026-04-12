@@ -70,7 +70,17 @@
     "engineBadge": "Motore: MiroFish-V1.0",
     "startEngine": "Avvia Motore",
     "initializing": "Inizializzazione...",
-    "startWithResearch": "Oppure inizia con un prompt di ricerca"
+    "startWithResearch": "Oppure inizia con un prompt di ricerca",
+    "step1Label": "STEP 01 · SEME DI REALTÀ",
+    "step1Hint": "Scegline uno",
+    "modeUploadTitle": "Carica documenti",
+    "modeUploadDesc": "PDF, Markdown, TXT, CSV. Hai già il materiale sorgente.",
+    "modeResearchTitle": "Ricerca da prompt",
+    "modeResearchDesc": "Descrivi cosa prevedere. Gli agenti AI raccolgono materiale sorgente tramite ricerca web.",
+    "researchNoticeTitle": "Modalità ricerca selezionata",
+    "researchNoticeDesc": "Descrivi il tuo obiettivo di previsione qui sotto. Quando fai clic su Avvia, gli agenti di ricerca raccoglieranno automaticamente il materiale sorgente prima che inizi la simulazione.",
+    "researchPromptPlaceholder": "es. Prevedere la reazione pubblica a un nuovo centro padel/pickleball a Wollongong, con una divisione 6+6 vs 10+0 di campi...",
+    "startEngineResearch": "Avvia con ricerca"
   },
   "main": {
     "layoutGraph": "Grafo",

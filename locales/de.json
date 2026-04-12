@@ -70,7 +70,17 @@
     "engineBadge": "Engine: MiroFish-V1.0",
     "startEngine": "Engine starten",
     "initializing": "Initialisierung...",
-    "startWithResearch": "Oder mit einer Recherche-Eingabeaufforderung beginnen"
+    "startWithResearch": "Oder mit einer Recherche-Eingabeaufforderung beginnen",
+    "step1Label": "SCHRITT 01 · REALITÄTS-KEIM",
+    "step1Hint": "Wähle eins",
+    "modeUploadTitle": "Dokumente hochladen",
+    "modeUploadDesc": "PDF, Markdown, TXT, CSV. Du hast bereits das Quellmaterial.",
+    "modeResearchTitle": "Aus Prompt recherchieren",
+    "modeResearchDesc": "Beschreibe, was vorherzusagen ist. KI-Agenten sammeln Quellmaterial über Websuche.",
+    "researchNoticeTitle": "Recherche-Modus ausgewählt",
+    "researchNoticeDesc": "Beschreibe dein Vorhersageziel unten. Beim Klick auf Start sammeln Recherche-Agenten vor Beginn der Simulation automatisch Quellmaterial.",
+    "researchPromptPlaceholder": "z. B. Vorhersage der öffentlichen Reaktion auf ein neues Padel/Pickleball-Zentrum in Wollongong mit einer 6+6- vs. 10+0-Platzaufteilung…",
+    "startEngineResearch": "Mit Recherche starten"
   },
   "main": {
     "layoutGraph": "Graph",

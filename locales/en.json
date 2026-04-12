@@ -70,7 +70,17 @@
     "engineBadge": "Engine: MiroFish-V1.0",
     "startEngine": "Start Engine",
     "initializing": "Initializing...",
-    "startWithResearch": "Or start with a research prompt"
+    "startWithResearch": "Or start with a research prompt",
+    "step1Label": "STEP 01 · REALITY SEED",
+    "step1Hint": "Choose one",
+    "modeUploadTitle": "Upload documents",
+    "modeUploadDesc": "PDF, Markdown, TXT, CSV. You already have the source material.",
+    "modeResearchTitle": "Research from prompt",
+    "modeResearchDesc": "Describe what to predict. AI agents gather source material via web search.",
+    "researchNoticeTitle": "Research mode selected",
+    "researchNoticeDesc": "Describe your prediction goal below. When you click Start, research agents will gather source material automatically before the simulation begins.",
+    "researchPromptPlaceholder": "e.g. Predict public reaction to a new padel/pickleball centre in Wollongong, with a 6+6 vs 10+0 court split...",
+    "startEngineResearch": "Start with research"
   },
   "main": {
     "layoutGraph": "Graph",

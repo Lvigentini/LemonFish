@@ -123,17 +123,48 @@
           </div>
         </div>
 
-        <!-- 右栏：交互控制台 -->
+        <!-- Right panel: interactive console -->
         <div class="right-panel">
           <div class="console-box">
-            <!-- 上传区域 -->
+
+            <!-- Step 1 source selector: upload OR research, side by side -->
             <div class="console-section">
               <div class="console-header">
-                <span class="console-label">{{ $t('home.realitySeed') }}</span>
-                <span class="console-meta">{{ $t('home.supportedFormats') }}</span>
+                <span class="console-label">{{ $t('home.step1Label') || 'STEP 01 · REALITY SEED' }}</span>
+                <span class="console-meta">{{ $t('home.step1Hint') || 'Choose one' }}</span>
               </div>
-              
-              <div 
+
+              <div class="mode-picker">
+                <button
+                  type="button"
+                  class="mode-card"
+                  :class="{ active: inputMode === 'upload' }"
+                  @click="setInputMode('upload')"
+                  :disabled="loading"
+                >
+                  <div class="mode-card-icon">📄</div>
+                  <div class="mode-card-title">{{ $t('home.modeUploadTitle') || 'Upload documents' }}</div>
+                  <div class="mode-card-desc">{{ $t('home.modeUploadDesc') || 'PDF, Markdown, TXT, CSV. You already have the source material.' }}</div>
+                </button>
+                <button
+                  type="button"
+                  class="mode-card"
+                  :class="{ active: inputMode === 'research', disabled: !researchAvailable }"
+                  @click="setInputMode('research')"
+                  :disabled="loading || !researchAvailable"
+                  :title="!researchAvailable ? 'Research module disabled. Set RESEARCH_ENABLED=true in .env.' : ''"
+                >
+                  <div class="mode-card-icon">🔎</div>
+                  <div class="mode-card-title">{{ $t('home.modeResearchTitle') || 'Research from prompt' }}</div>
+                  <div class="mode-card-desc">{{ $t('home.modeResearchDesc') || 'Describe what to predict. AI agents gather source material via web search.' }}</div>
+                  <div v-if="!researchAvailable" class="mode-card-badge">disabled</div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Upload zone (only when upload mode selected) -->
+            <div v-if="inputMode === 'upload'" class="console-section">
+              <div
                 class="upload-zone"
                 :class="{ 'drag-over': isDragOver, 'has-files': files.length > 0 }"
                 @dragover.prevent="handleDragOver"
@@ -150,13 +181,13 @@
                   style="display: none"
                   :disabled="loading"
                 />
-                
+
                 <div v-if="files.length === 0" class="upload-placeholder">
                   <div class="upload-icon">↑</div>
                   <div class="upload-title">{{ $t('home.dragToUpload') }}</div>
                   <div class="upload-hint">{{ $t('home.orBrowse') }}</div>
                 </div>
-                
+
                 <div v-else class="file-list">
                   <div v-for="(file, index) in files" :key="index" class="file-item">
                     <span class="file-icon">📄</span>
@@ -167,12 +198,25 @@
               </div>
             </div>
 
-            <!-- 分割线 -->
+            <!-- Research notice (only when research mode selected) -->
+            <div v-if="inputMode === 'research'" class="console-section">
+              <div class="research-notice">
+                <div class="research-notice-icon">⚡</div>
+                <div class="research-notice-body">
+                  <div class="research-notice-title">{{ $t('home.researchNoticeTitle') || 'Research mode selected' }}</div>
+                  <div class="research-notice-desc">
+                    {{ $t('home.researchNoticeDesc') || 'Describe your prediction goal below. When you click Start, research agents will gather source material automatically before the simulation begins.' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Divider -->
             <div class="console-divider">
               <span>{{ $t('home.inputParams') }}</span>
             </div>
 
-            <!-- 输入区域 -->
+            <!-- Prompt input (shared across modes) -->
             <div class="console-section">
               <div class="console-header">
                 <span class="console-label">{{ $t('home.simulationPrompt') }}</span>
@@ -181,7 +225,7 @@
                 <textarea
                   v-model="formData.simulationRequirement"
                   class="code-input"
-                  :placeholder="$t('home.promptPlaceholder')"
+                  :placeholder="inputMode === 'research' ? ($t('home.researchPromptPlaceholder') || 'e.g. Predict public reaction to a new padel/pickleball centre in Wollongong, with a 6+6 vs 10+0 court split...') : $t('home.promptPlaceholder')"
                   rows="6"
                   :disabled="loading"
                 ></textarea>
@@ -189,23 +233,20 @@
               </div>
             </div>
 
-            <!-- 启动按钮 -->
+            <!-- Start button — branches on input mode -->
             <div class="console-section btn-section">
               <button
                 class="start-engine-btn"
-                @click="startSimulation"
-                :disabled="!canSubmit || loading"
+                @click="startEntry"
+                :disabled="!canStart || loading"
               >
-                <span v-if="!loading">{{ $t('home.startEngine') }}</span>
+                <span v-if="!loading">
+                  {{ inputMode === 'research'
+                     ? ($t('home.startEngineResearch') || 'Start with research')
+                     : $t('home.startEngine') }}
+                </span>
                 <span v-else>{{ $t('home.initializing') }}</span>
                 <span class="btn-arrow">→</span>
-              </button>
-              <button
-                class="research-link-btn"
-                type="button"
-                @click="goToResearch"
-              >
-                {{ $t('home.startWithResearch') }} <span class="btn-arrow">→</span>
               </button>
             </div>
           </div>
@@ -219,33 +260,64 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
+import { getResearchAvailability } from '../api/research'
 
 const router = useRouter()
 const appVersion = __APP_VERSION__
 
-// 表单数据
+// Form state
 const formData = ref({
   simulationRequirement: ''
 })
 
-// 文件列表
+// Uploaded files
 const files = ref([])
 
-// 状态
+// UI state
 const loading = ref(false)
 const error = ref('')
 const isDragOver = ref(false)
 
-// 文件输入引用
+// Input mode toggle: 'upload' (Phase 0) or 'research' (Phase 8)
+const inputMode = ref('upload')
+const researchAvailable = ref(false)
+
+// File input ref
 const fileInput = ref(null)
 
-// 计算属性:是否可以提交
+// On mount, probe the research endpoint to see if the module is enabled.
+// If available, the research card is clickable; otherwise it's disabled
+// with a tooltip explaining how to enable it.
+onMounted(async () => {
+  try {
+    const res = await getResearchAvailability()
+    // getResearchAvailability returns the response body directly (interceptor)
+    researchAvailable.value = !!res && (res.enabled !== false)
+  } catch (e) {
+    researchAvailable.value = false
+  }
+})
+
+const setInputMode = (mode) => {
+  if (loading.value) return
+  if (mode === 'research' && !researchAvailable.value) return
+  inputMode.value = mode
+}
+
+// Upload mode requires files + prompt; research mode only needs prompt
 const canSubmit = computed(() => {
   return formData.value.simulationRequirement.trim() !== '' && files.value.length > 0
+})
+const canStart = computed(() => {
+  const hasPrompt = formData.value.simulationRequirement.trim() !== ''
+  if (inputMode.value === 'upload') {
+    return hasPrompt && files.value.length > 0
+  }
+  return hasPrompt && researchAvailable.value
 })
 
 // 触发文件选择
@@ -302,25 +374,28 @@ const scrollToBottom = () => {
   })
 }
 
-// 开始模拟 - 立即跳转，API调用在Process页面进行
-const startSimulation = () => {
-  if (!canSubmit.value || loading.value) return
+// Start button entry point — branches on the chosen input mode.
+// - upload mode: stash files + requirement, jump to Process view
+// - research mode: jump to Step0Research with the requirement pre-filled
+const startEntry = () => {
+  if (!canStart.value || loading.value) return
 
-  // 存储待上传的数据
+  if (inputMode.value === 'research') {
+    router.push({
+      name: 'Research',
+      query: { requirement: formData.value.simulationRequirement },
+    })
+    return
+  }
+
+  // Upload mode (default)
   import('../store/pendingUpload.js').then(({ setPendingUpload }) => {
     setPendingUpload(files.value, formData.value.simulationRequirement)
-
-    // 立即跳转到Process页面（使用特殊标识表示新建项目）
     router.push({
       name: 'Process',
       params: { projectId: 'new' }
     })
   })
-}
-
-// Phase 8 — alternate entry point: research-from-prompt instead of file upload
-const goToResearch = () => {
-  router.push({ name: 'Research' })
 }
 </script>
 
@@ -894,30 +969,116 @@ const goToResearch = () => {
   border: 1px solid #E5E5E5;
 }
 
-/* Phase 8 — alternate entry to Step 0 (research from prompt) */
-.research-link-btn {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  padding: 10px 16px;
-  background: transparent;
-  color: #ff4500;
-  border: 1px dashed #ff4500;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.15s;
+/* Phase 8 UI — side-by-side input mode picker (upload vs research) */
+.mode-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
 }
 
-.research-link-btn:hover {
+.mode-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 16px 14px;
+  background: #fafafa;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  color: inherit;
+}
+
+.mode-card:hover:not(:disabled):not(.disabled) {
+  border-color: #ff4500;
   background: #fff8f5;
 }
 
-.research-link-btn .btn-arrow {
-  margin-left: 6px;
+.mode-card.active {
+  border-color: #ff4500;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(255, 69, 0, 0.15);
+}
+
+.mode-card:disabled,
+.mode-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mode-card-icon {
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.mode-card-title {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  color: #000;
+}
+
+.mode-card-desc {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.mode-card-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 6px;
+  background: #e0e0e0;
+  color: #666;
+  font-size: 9px;
+  text-transform: uppercase;
+  border-radius: 2px;
+  letter-spacing: 0.5px;
+}
+
+/* Research mode info banner */
+.research-notice {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fff8f5;
+  border: 1px solid #ffd9c9;
+  border-radius: 6px;
+}
+
+.research-notice-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.research-notice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.research-notice-title {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #ff4500;
+  letter-spacing: 0.5px;
+}
+
+.research-notice-desc {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.4;
 }
 
 /* 引导动画：微妙的边框脉冲 */

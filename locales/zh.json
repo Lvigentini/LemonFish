@@ -70,7 +70,17 @@
     "engineBadge": "引擎: MiroFish-V1.0",
     "startEngine": "启动引擎",
     "initializing": "初始化中...",
-    "startWithResearch": "或从研究提示词开始"
+    "startWithResearch": "或从研究提示词开始",
+    "step1Label": "第一步 · 现实种子",
+    "step1Hint": "选择其一",
+    "modeUploadTitle": "上传文档",
+    "modeUploadDesc": "PDF、Markdown、TXT、CSV。您已有源材料。",
+    "modeResearchTitle": "从提示词研究",
+    "modeResearchDesc": "描述要预测的内容。AI 代理将通过网络搜索收集源材料。",
+    "researchNoticeTitle": "已选择研究模式",
+    "researchNoticeDesc": "请在下方描述您的预测目标。点击开始后，研究代理将在模拟开始前自动收集源材料。",
+    "researchPromptPlaceholder": "例如：预测公众对伍伦贡新建一个匹克球/帕德尔中心（6+6 与 10+0 场地分配）的反应……",
+    "startEngineResearch": "开始研究"
   },
   "main": {
     "layoutGraph": "图谱",
