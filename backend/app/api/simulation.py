@@ -2837,6 +2837,69 @@ def probe_providers():
         }), 500
 
 
+# ============== Phase 5: Capability Detection API ==============
+
+@simulation_bp.route('/providers/capabilities', methods=['GET'])
+def get_provider_capabilities():
+    """Return the cached capability records for all probed providers."""
+    try:
+        from ..utils.capability_detector import get_all_cached
+        cache = get_all_cached()
+        return jsonify({
+            "success": True,
+            "data": {
+                "count": len(cache),
+                "providers": list(cache.values()),
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to get capabilities: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@simulation_bp.route('/providers/capabilities/probe', methods=['POST'])
+def probe_capability():
+    """Force a capability probe for a specific (base_url, model) pair.
+
+    Request JSON:
+        base_url: str (required)
+        model: str (required)
+        api_key: str (required — not stored, only used for the test call)
+    """
+    try:
+        from ..utils.capability_detector import force_refresh
+        data = request.get_json() or {}
+        base_url = data.get('base_url')
+        model = data.get('model')
+        api_key = data.get('api_key')
+        if not (base_url and model and api_key):
+            return jsonify({
+                "success": False,
+                "error": "base_url, model, and api_key are required"
+            }), 400
+        record = force_refresh(api_key=api_key, base_url=base_url, model=model)
+        # Strip nothing — the record doesn't contain the api_key
+        return jsonify({"success": True, "data": record})
+    except Exception as e:
+        logger.error(f"Capability probe failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@simulation_bp.route('/providers/capabilities/clear', methods=['POST'])
+def clear_capabilities():
+    """Clear the capability cache. Next call will re-probe."""
+    try:
+        from ..utils.capability_detector import clear_cache
+        clear_cache()
+        return jsonify({"success": True, "message": "Capability cache cleared"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @simulation_bp.route('/providers/allocate', methods=['POST'])
 def allocate_providers():
     """Preview how agents would be randomly allocated across the pool.

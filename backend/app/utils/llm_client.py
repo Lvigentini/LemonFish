@@ -13,6 +13,7 @@ from openai import OpenAI, RateLimitError, APIStatusError, APITimeoutError, APIC
 from ..config import Config
 from .locale import t
 from .token_tracker import TokenTracker
+from .capability_detector import supports_json_mode
 
 logger = logging.getLogger(__name__)
 
@@ -145,30 +146,78 @@ class LLMClient:
         max_tokens: int = 4096
     ) -> Dict[str, Any]:
         """
-        发送聊天请求并返回JSON
+        Send a chat request and return parsed JSON.
+
+        Automatically detects whether the provider supports OpenAI's
+        response_format=json_object parameter. If not (Anthropic, some
+        Grok models, etc.), falls back to a prompt-based JSON extraction
+        that appends a "respond in JSON only" instruction to the system
+        message.
 
         Args:
-            messages: 消息列表
-            temperature: 温度参数
-            max_tokens: 最大token数
+            messages: message list
+            temperature: sampling temperature
+            max_tokens: max output tokens
 
         Returns:
-            解析后的JSON对象
+            Parsed JSON object
         """
-        response = self.chat(
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"}
-        )
-        # Clean markdown code block markers
+        use_native_json = supports_json_mode(self.api_key, self.base_url, self.model)
+
+        if use_native_json:
+            response = self.chat(
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"}
+            )
+        else:
+            # Prompt-based JSON extraction for providers without response_format support
+            logger.info(f"Provider {self.base_url} does not support response_format; using prompt-based JSON")
+            augmented_messages = _augment_messages_for_json(messages)
+            response = self.chat(
+                messages=augmented_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format=None,
+            )
+
+        # Clean markdown code block markers (even native JSON mode sometimes wraps in fences)
         cleaned_response = response.strip()
         cleaned_response = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
         cleaned_response = re.sub(r'\n?```\s*$', '', cleaned_response)
         cleaned_response = cleaned_response.strip()
+
+        # If the response contains text around JSON, try to extract the first {...} block
+        if not cleaned_response.startswith('{') and not cleaned_response.startswith('['):
+            json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', cleaned_response)
+            if json_match:
+                cleaned_response = json_match.group(1)
 
         try:
             return json.loads(cleaned_response)
         except json.JSONDecodeError:
             logger.error(f"LLM returned invalid JSON: {cleaned_response[:500]}")
             raise ValueError(t('backend.llmInvalidJson', response=cleaned_response))
+
+
+def _augment_messages_for_json(messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Add a JSON instruction to the system message (or prepend one if absent)."""
+    suffix = (
+        "\n\nIMPORTANT: Respond with ONLY valid JSON. No prose, no markdown fences, "
+        "no explanations. Start your response with { and end with }."
+    )
+    augmented = []
+    system_found = False
+    for msg in messages:
+        if msg.get('role') == 'system' and not system_found:
+            augmented.append({**msg, 'content': msg.get('content', '') + suffix})
+            system_found = True
+        else:
+            augmented.append(msg)
+    if not system_found:
+        augmented.insert(0, {
+            'role': 'system',
+            'content': 'Respond with ONLY valid JSON. Start with { and end with }.'
+        })
+    return augmented

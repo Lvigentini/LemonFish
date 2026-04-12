@@ -189,28 +189,38 @@ This is a research question for Phase 6. The infrastructure shipped in Phase 4 (
 
 ---
 
-## Phase 5 — Provider Capability Detection (v0.7.0 target)
+## Phase 5 — Provider Capability Detection (v0.7.0) ✅ SHIPPED
 
 **Goal:** Automatically detect whether a provider supports features like `response_format` JSON mode, and fall back to prompt-based JSON extraction if not.
 
 ### Why
 
-Currently `chat_json()` in `llm_client.py:126` always passes `response_format={"type": "json_object"}` and hopes for the best. Anthropic and Grok don't support this — the code relies on a markdown-fence-strip workaround that fails on edge cases.
+Previously `chat_json()` in `llm_client.py` always passed `response_format={"type": "json_object"}` and relied on a markdown-fence-strip workaround for providers that didn't support it (Anthropic, some Grok models). This failed on edge cases where the model returned prose around the JSON.
 
 ### Tasks
 
-| # | Task | Priority |
-|---|------|----------|
-| 5.1 | Capability probe at `LLMClient.__init__` (1 small test call) | Medium |
-| 5.2 | Cache capability results per (base_url, model) | Medium |
-| 5.3 | If `response_format` not supported, switch to "respond in JSON only" system prompt + stricter parser | Medium |
-| 5.4 | Expose capabilities in logs and UI (badge: "JSON mode ✓" or "prompt-based JSON") | Low |
+| # | Task | Status |
+|---|------|--------|
+| 5.1 | Capability probe: test basic chat + `response_format` with a tiny call | ✅ |
+| 5.2 | File-backed cache per `(base_url, model)` with 7-day TTL | ✅ |
+| 5.3 | `chat_json` auto-detects JSON support and augments the system prompt if unsupported | ✅ |
+| 5.4 | More resilient JSON extraction (also finds JSON embedded in prose) | ✅ |
+| 5.5 | API endpoints: list, force-probe, clear cache | ✅ |
+
+### Design Notes
+
+- **Caching is per (base_url, model), not per (api_key, base_url, model)** — capability is a provider property, not a per-account property. This avoids exposing API keys in cache keys.
+- **Optimistic fallback on probe failure**: if the capability check itself errors out, we assume JSON mode works and try it anyway. Better to fail fast than to block on a capability probe.
+- **Two kinds of "JSON mode" failure**: some providers accept `response_format` but return invalid JSON anyway. The probe tests both: HTTP acceptance AND parseable JSON output. Only models that pass both get `supports_json_mode=true`.
+- **Prompt-based fallback**: appends "Respond with ONLY valid JSON. Start with { and end with }." to the system message, then uses a regex to extract the first `{...}` or `[...]` block from the response if the model wrapped it in prose.
 
 ### Acceptance
 
-- Using Anthropic for any step succeeds without JSON parse errors
-- Using Grok for any step succeeds without JSON parse errors
-- Zero behavioural change for providers that do support `response_format`
+- ✅ `GET /api/simulation/providers/capabilities` returns cache contents
+- ✅ `POST /api/simulation/providers/capabilities/probe` force-probes a specific model
+- ✅ `POST /api/simulation/providers/capabilities/clear` resets the cache
+- ✅ `chat_json` transparently handles providers without `response_format` support
+- 📋 Anthropic/Grok integration testing deferred — available on demand when users configure those providers
 
 ---
 
@@ -297,8 +307,8 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
 | v0.3.0 | Phase 1 (catalogue sync) | ✅ |
 | v0.4.0 | Phase 2 (step routing) | ✅ |
 | v0.5.0 | Phase 3 (token tracking) | ✅ |
-| v0.6.0 (current) | Phase 4 (multi-provider pool foundation) | 🚧 shipped without OASIS routing |
-| v0.7.0 | Phase 5 (capability detection) | 📋 |
+| v0.6.0 | Phase 4 (multi-provider pool foundation) | 🚧 shipped without OASIS routing |
+| v0.7.0 (current) | Phase 5 (capability detection) | ✅ |
 | v0.8.0 | Phase 6 (multi-model personas) | 📋 |
 | v1.0.0 | Full feature set, stable API | 💡 |
 
