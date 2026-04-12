@@ -128,13 +128,15 @@ def generate_report():
         def run_generate():
             set_locale(current_locale)
             try:
+                from ..utils.token_tracker import TokenTracker
+                TokenTracker.set_context(simulation_id=simulation_id, step='report')
                 task_manager.update_task(
                     task_id,
                     status=TaskStatus.PROCESSING,
                     progress=0,
                     message=t('api.initReportAgent')
                 )
-                
+
                 # 创建Report Agent
                 agent = ReportAgent(
                     graph_id=graph_id,
@@ -174,7 +176,9 @@ def generate_report():
             except Exception as e:
                 logger.error(f"报告生成失败: {str(e)}")
                 task_manager.fail_task(task_id, str(e))
-        
+            finally:
+                TokenTracker.clear_context()
+
         # 启动后台线程
         thread = threading.Thread(target=run_generate, daemon=True)
         thread.start()

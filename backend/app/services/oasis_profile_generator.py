@@ -21,6 +21,22 @@ from zep_cloud.client import Zep
 from ..config import Config
 from ..utils.logger import get_logger
 from ..utils.locale import get_language_instruction, get_locale, set_locale, t
+from ..utils.token_tracker import TokenTracker
+
+
+def _record_token_usage(response, model: str, base_url: Optional[str] = None):
+    """Record usage from an OpenAI SDK response (silently no-ops on failure)."""
+    try:
+        usage = getattr(response, 'usage', None)
+        if usage is not None:
+            TokenTracker.record_usage(
+                input_tokens=getattr(usage, 'prompt_tokens', 0) or 0,
+                output_tokens=getattr(usage, 'completion_tokens', 0) or 0,
+                model=model,
+                base_url=base_url,
+            )
+    except Exception:
+        pass
 from .zep_entity_reader import EntityNode, ZepEntityReader
 
 logger = get_logger('mirofish.oasis_profile')
@@ -541,6 +557,7 @@ class OasisProfileGenerator:
                     temperature=0.7 - (attempt * 0.1)  # 每次重试降低温度
                     # 不设置max_tokens，让LLM自由发挥
                 )
+                _record_token_usage(response, self.model_name, self.base_url)
                 
                 content = response.choices[0].message.content
                 

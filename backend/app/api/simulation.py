@@ -508,6 +508,9 @@ def prepare_simulation():
         # 定义后台任务
         def run_prepare():
             set_locale(current_locale)
+            from ..utils.token_tracker import TokenTracker
+            # Step context will be refined to 'profiles' / 'config' by progress_callback
+            TokenTracker.set_context(simulation_id=simulation_id, step='profiles')
             try:
                 task_manager.update_task(
                     task_id,
@@ -521,6 +524,11 @@ def prepare_simulation():
                 stage_details = {}
                 
                 def progress_callback(stage, progress, message, **kwargs):
+                    # Update token tracking step based on the current stage
+                    if stage == "generating_profiles":
+                        TokenTracker.set_context(simulation_id=simulation_id, step='profiles')
+                    elif stage == "generating_config":
+                        TokenTracker.set_context(simulation_id=simulation_id, step='config')
                     # 计算总进度
                     stage_weights = {
                         "reading": (0, 20),           # 0-20%
@@ -600,14 +608,16 @@ def prepare_simulation():
             except Exception as e:
                 logger.error(f"准备模拟失败: {str(e)}")
                 task_manager.fail_task(task_id, str(e))
-                
+
                 # 更新模拟状态为失败
                 state = manager.get_simulation(simulation_id)
                 if state:
                     state.status = SimulationStatus.FAILED
                     state.error = str(e)
                     manager._save_simulation_state(state)
-        
+            finally:
+                TokenTracker.clear_context()
+
         # 启动后台线程
         thread = threading.Thread(target=run_prepare, daemon=True)
         thread.start()
@@ -2714,4 +2724,68 @@ def close_simulation_env():
             "success": False,
             "error": str(e),
             "traceback": traceback.format_exc()
+        }), 500
+
+
+# ============== Token Estimation & Tracking API (Phase 3) ==============
+
+@simulation_bp.route('/estimate', methods=['POST'])
+def estimate_tokens():
+    """Estimate token consumption for a planned simulation.
+
+    Request JSON:
+        agents: int (required)
+        rounds: int (required)
+        document_chars: int (required)
+        report_sections: int (optional, default 4)
+    """
+    try:
+        from ..services.token_estimator import estimate
+        data = request.get_json() or {}
+        agents = int(data.get('agents', 0))
+        rounds = int(data.get('rounds', 0))
+        document_chars = int(data.get('document_chars', 0))
+        report_sections = int(data.get('report_sections', 4))
+
+        if agents <= 0 or rounds <= 0:
+            return jsonify({
+                "success": False,
+                "error": "agents and rounds must be positive integers"
+            }), 400
+
+        result = estimate(
+            agents=agents,
+            rounds=rounds,
+            document_chars=document_chars,
+            report_sections=report_sections,
+        )
+        return jsonify({"success": True, "data": result})
+    except Exception as e:
+        logger.error(f"Token estimation failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@simulation_bp.route('/token-usage/<simulation_id>', methods=['GET'])
+def get_token_usage(simulation_id: str):
+    """Get actual token usage for a simulation (or project for ontology step)."""
+    try:
+        from ..utils.token_tracker import TokenTracker
+        data = TokenTracker.get_totals(simulation_id)
+        grand_total = TokenTracker.get_grand_total(simulation_id)
+        return jsonify({
+            "success": True,
+            "data": {
+                **data,
+                "grand_total": grand_total,
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to fetch token usage: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
         }), 500

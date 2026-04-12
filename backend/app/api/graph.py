@@ -214,12 +214,17 @@ def generate_ontology():
         
         # 生成本体
         logger.info("调用 LLM 生成本体定义...")
-        generator = OntologyGenerator()
-        ontology = generator.generate(
-            document_texts=document_texts,
-            simulation_requirement=simulation_requirement,
-            additional_context=additional_context if additional_context else None
-        )
+        from ..utils.token_tracker import TokenTracker
+        TokenTracker.set_context(simulation_id=project.project_id, step='ontology')
+        try:
+            generator = OntologyGenerator()
+            ontology = generator.generate(
+                document_texts=document_texts,
+                simulation_requirement=simulation_requirement,
+                additional_context=additional_context if additional_context else None
+            )
+        finally:
+            TokenTracker.clear_context()
         
         # 保存本体到项目
         entity_count = len(ontology.get("entity_types", []))

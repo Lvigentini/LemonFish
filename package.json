@@ -1,6 +1,6 @@
 {
   "name": "mirofish",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "MiroFish [LemonFish] - Multi-agent prediction engine",
   "scripts": {
     "setup": "npm install && cd frontend && npm install",

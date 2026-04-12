@@ -102,6 +102,14 @@ else:
         load_dotenv(_backend_env)
         print(f"已加载环境配置: {_backend_env}")
 
+# Install token usage instrumentation (monkey-patches openai SDK).
+# No-op if MIROFISH_SIMULATION_ID is not set in the environment.
+try:
+    from token_instrumentation import install as _install_token_tracking
+    _install_token_tracking()
+except Exception as _e:
+    print(f"[warn] token instrumentation failed to install: {_e}")
+
 
 class MaxTokensWarningFilter(logging.Filter):
     """过滤掉 camel-ai 关于 max_tokens 的警告（我们故意不设置 max_tokens，让模型自行决定）"""

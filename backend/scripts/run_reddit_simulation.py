@@ -46,6 +46,13 @@ else:
     if os.path.exists(_backend_env):
         load_dotenv(_backend_env)
 
+# Install token usage instrumentation (no-op unless MIROFISH_SIMULATION_ID set)
+try:
+    from token_instrumentation import install as _install_token_tracking
+    _install_token_tracking()
+except Exception as _e:
+    print(f"[warn] token instrumentation failed to install: {_e}")
+
 
 import re
 

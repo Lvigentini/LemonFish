@@ -14,6 +14,8 @@ RUN npm ci
 COPY frontend/ ./
 # Locales are referenced via @locales alias (../locales from frontend/)
 COPY locales/ /locales/
+# vite.config.js reads version from ../package.json (root package.json)
+COPY package.json /package.json
 # Build with empty base URL so API calls go to same origin
 ENV VITE_API_BASE_URL=""
 RUN npm run build

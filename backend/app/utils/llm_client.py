@@ -12,6 +12,7 @@ from openai import OpenAI, RateLimitError, APIStatusError, APITimeoutError, APIC
 
 from ..config import Config
 from .locale import t
+from .token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,20 @@ class LLMClient:
                 response = self.client.chat.completions.create(**kwargs)
                 if attempt > 0:
                     logger.info(t('backend.llmRetrySuccess', attempt=attempt + 1, model=model))
+                # Record token usage if available (OpenAI-compatible responses include .usage)
+                try:
+                    usage = getattr(response, 'usage', None)
+                    if usage is not None:
+                        input_tokens = getattr(usage, 'prompt_tokens', 0) or 0
+                        output_tokens = getattr(usage, 'completion_tokens', 0) or 0
+                        TokenTracker.record_usage(
+                            input_tokens=input_tokens,
+                            output_tokens=output_tokens,
+                            model=model,
+                            base_url=self.base_url,
+                        )
+                except Exception as track_err:
+                    logger.debug(f"Token tracking failed (non-fatal): {track_err}")
                 return response
             except Exception as e:
                 last_error = e

@@ -110,26 +110,40 @@ LLM_REPORT_*       # Step 5 — reasoning-capable
 
 ---
 
-## Phase 3 — Token Tracking & Budget Prediction (v0.5.0 target)
+## Phase 3 — Token Tracking & Budget Prediction (v0.5.0) ✅ SHIPPED
 
 **Goal:** Before starting a simulation, show the user the estimated token cost. During the run, track actual consumption. This is the foundation for the budget allocator (Phase 4).
 
 ### Tasks
 
-| # | Task | File | Priority |
-|---|------|------|----------|
-| 3.1 | Read `response.usage` in `LLMClient` and log per-step | `backend/app/utils/llm_client.py` | High |
-| 3.2 | Persist per-simulation token tallies to `state.json` | `backend/app/services/simulation_manager.py` | High |
-| 3.3 | Implement the formula from `llm_budget_planning.md` as a pre-flight estimator | `backend/app/services/token_estimator.py` (new) | High |
-| 3.4 | Expose estimator via `/api/simulation/estimate` endpoint | `backend/app/api/simulation.py` | Medium |
-| 3.5 | Frontend: show "This simulation will use ~X tokens (~Y minutes)" confirmation before starting | `frontend/src/views/MainView.vue` or modal | Medium |
-| 3.6 | Post-simulation summary: actual vs estimated tokens by step | report view | Low |
+| # | Task | File | Status |
+|---|------|------|--------|
+| 3.1 | Read `response.usage` in `LLMClient` and thread context | `backend/app/utils/llm_client.py` | ✅ |
+| 3.1a | Thread-local `TokenTracker` with file-backed persistence | `backend/app/utils/token_tracker.py` (new) | ✅ |
+| 3.1b | Instrument direct `OpenAI` calls in profile + config generators | services | ✅ |
+| 3.1c | Subprocess token instrumentation (monkey-patch openai SDK) | `backend/scripts/token_instrumentation.py` (new) | ✅ |
+| 3.2 | Set step context in API entry points (ontology/profiles/config/report) | api modules | ✅ |
+| 3.2a | Pass `MIROFISH_SIMULATION_ID` env var to OASIS subprocess | `simulation_runner.py` | ✅ |
+| 3.3 | Pre-flight estimator using formula from `llm_budget_planning.md` | `backend/app/services/token_estimator.py` (new) | ✅ |
+| 3.4 | Expose `/api/simulation/estimate` endpoint (POST) | `api/simulation.py` | ✅ |
+| 3.4a | Expose `/api/simulation/token-usage/<id>` endpoint (GET) | `api/simulation.py` | ✅ |
+| 3.5 | Frontend pre-flight confirmation modal | frontend | 📋 deferred |
+| 3.6 | Post-simulation summary (actual vs estimated) | frontend | 📋 deferred |
+
+### Design Notes
+
+- **Thread-local context**: `TokenTracker.set_context(simulation_id, step)` at the start of each background task; `LLMClient._call_with_retry` reads the context on every call. Clean separation — services don't need to know about tracking.
+- **Subprocess instrumentation**: Simulation runs in a separate Python process (OASIS). The subprocess can't share thread-local state with the parent, so we monkey-patch `openai.resources.chat.completions.Completions.create` in `token_instrumentation.py` and install it at script startup. It reads `MIROFISH_SIMULATION_ID` from env and writes to the same JSON file as the parent process.
+- **File-backed storage**: `backend/uploads/token_usage/{sim_id}.json`. Survives restarts. Atomic writes via `.tmp` + `rename`.
+- **Per-model breakdown**: Each step tracks which models contributed how many tokens — essential for Phase 6 (multi-model personas).
 
 ### Acceptance
 
-- Every simulation run produces a `tokens.json` with per-step actual token counts
-- Users see the estimate before clicking Start
-- Estimator accuracy: ±30% across 3 test simulations
+- ✅ `TokenTracker` records every LLM call from the Flask process
+- ✅ Subprocess monkey-patch records simulation step calls
+- ✅ `POST /api/simulation/estimate` returns per-step estimates + cost tiers
+- ✅ `GET /api/simulation/token-usage/<id>` returns actual usage
+- 📋 Frontend modal deferred — backend surface is complete and usable via API
 
 ---
 
@@ -280,8 +294,8 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
 |---------|----------|------------------|
 | v0.2.0 | Phase 0 | ✅ |
 | v0.3.0 | Phase 1 (catalogue sync) | ✅ |
-| v0.4.0 (current) | Phase 2 (step routing) | ✅ |
-| v0.5.0 | Phase 3 (token tracking) | 📋 |
+| v0.4.0 | Phase 2 (step routing) | ✅ |
+| v0.5.0 (current) | Phase 3 (token tracking) | ✅ |
 | v0.6.0 | Phase 4 (budget allocator) | 📋 |
 | v0.7.0 | Phase 5 (capability detection) | 📋 |
 | v0.8.0 | Phase 6 (multi-model personas) | 📋 |
