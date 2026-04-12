@@ -19,6 +19,7 @@ class TaskStatus(str, Enum):
     PROCESSING = "processing"    # 处理中
     COMPLETED = "completed"      # 已完成
     FAILED = "failed"            # 失败
+    CANCELLED = "cancelled"      # 已取消 (Phase 7)
 
 
 @dataclass
@@ -61,7 +62,7 @@ class TaskManager:
     
     _instance = None
     _lock = threading.Lock()
-    
+
     def __new__(cls):
         """单例模式"""
         if cls._instance is None:
@@ -70,6 +71,7 @@ class TaskManager:
                     cls._instance = super().__new__(cls)
                     cls._instance._tasks: Dict[str, Task] = {}
                     cls._instance._task_lock = threading.Lock()
+                    cls._instance._cancel_events: Dict[str, threading.Event] = {}
         return cls._instance
     
     def create_task(self, task_type: str, metadata: Optional[Dict] = None) -> str:
@@ -161,6 +163,41 @@ class TaskManager:
             status=TaskStatus.FAILED,
             message=t('progress.taskFailed'),
             error=error
+        )
+
+    # --- Phase 7: cancellation support ---
+    def request_cancel(self, task_id: str) -> bool:
+        """Request cancellation of a running task.
+
+        Returns True if a cancel event was set, False if task not found or already done.
+        The worker thread must call `is_cancelled(task_id)` at safe checkpoints
+        (e.g., batch boundaries) to observe the cancellation.
+        """
+        with self._task_lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return False
+            if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+                return False
+            event = self._cancel_events.get(task_id)
+            if event is None:
+                event = threading.Event()
+                self._cancel_events[task_id] = event
+            event.set()
+            return True
+
+    def is_cancelled(self, task_id: str) -> bool:
+        """Check if a task has been asked to cancel."""
+        with self._task_lock:
+            event = self._cancel_events.get(task_id)
+            return bool(event and event.is_set())
+
+    def cancel_task(self, task_id: str, reason: str = ""):
+        """Mark a task as cancelled (worker thread calls this when it observes the cancel flag)."""
+        self.update_task(
+            task_id,
+            status=TaskStatus.CANCELLED,
+            message=reason or "Cancelled by user",
         )
     
     def list_tasks(self, task_type: Optional[str] = None) -> list:

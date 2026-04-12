@@ -253,6 +253,17 @@ def generate_ontology():
         })
         
     except Exception as e:
+        # Phase 7: orphan project cleanup on ontology generation failure.
+        # A half-built project with no ontology is useless and clutters the
+        # project list. Clean it up unless the failure happened before the
+        # project was even created.
+        try:
+            if 'project' in locals() and hasattr(project, 'project_id') and project.status == ProjectStatus.CREATED:
+                logger.info(f"Cleaning up orphan project {project.project_id} after ontology failure")
+                ProjectManager.delete_project(project.project_id)
+        except Exception as cleanup_err:
+            logger.warning(f"Orphan cleanup failed: {cleanup_err}")
+
         return jsonify({
             "success": False,
             "error": str(e),
@@ -443,10 +454,11 @@ def build_graph():
                 )
                 
                 episode_uuids = builder.add_text_batches(
-                    graph_id, 
+                    graph_id,
                     chunks,
                     batch_size=3,
-                    progress_callback=add_progress_callback
+                    progress_callback=add_progress_callback,
+                    cancel_check=lambda: task_manager.is_cancelled(task_id),
                 )
                 
                 # 等待Zep处理完成（查询每个episode的processed状态）
@@ -498,14 +510,24 @@ def build_graph():
                 )
                 
             except Exception as e:
+                # Phase 7: handle cancellation separately from hard failures
+                from ..services.graph_builder import CancelledError
+                if isinstance(e, CancelledError):
+                    build_logger.info(f"[{task_id}] Graph build cancelled: {e}")
+                    project.status = ProjectStatus.FAILED
+                    project.error = f"Cancelled: {e}"
+                    ProjectManager.save_project(project)
+                    task_manager.cancel_task(task_id, reason=str(e))
+                    return
+
                 # 更新项目状态为失败
                 build_logger.error(f"[{task_id}] 图谱构建失败: {str(e)}")
                 build_logger.debug(traceback.format_exc())
-                
+
                 project.status = ProjectStatus.FAILED
                 project.error = str(e)
                 ProjectManager.save_project(project)
-                
+
                 task_manager.update_task(
                     task_id,
                     status=TaskStatus.FAILED,
@@ -542,16 +564,49 @@ def get_task(task_id: str):
     查询任务状态
     """
     task = TaskManager().get_task(task_id)
-    
+
     if not task:
         return jsonify({
             "success": False,
             "error": t('api.taskNotFound', id=task_id)
         }), 404
-    
+
     return jsonify({
         "success": True,
         "data": task.to_dict()
+    })
+
+
+@graph_bp.route('/task/<task_id>/cancel', methods=['POST'])
+def cancel_task_endpoint(task_id: str):
+    """Phase 7: request cancellation of a running task (e.g., graph build).
+
+    The worker observes the cancellation at the next batch boundary and
+    transitions the task to CANCELLED status. Any progress already made
+    (episodes already sent to Zep) is preserved — cancellation is a clean
+    stop, not a rollback.
+    """
+    task_manager = TaskManager()
+    task = task_manager.get_task(task_id)
+    if not task:
+        return jsonify({
+            "success": False,
+            "error": t('api.taskNotFound', id=task_id)
+        }), 404
+
+    ok = task_manager.request_cancel(task_id)
+    if not ok:
+        return jsonify({
+            "success": False,
+            "error": f"Task {task_id} is not cancellable (status: {task.status.value})"
+        }), 400
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "task_id": task_id,
+            "message": "Cancellation requested. Task will stop at next batch boundary."
+        }
     })
 
 

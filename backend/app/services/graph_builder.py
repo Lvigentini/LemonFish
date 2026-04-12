@@ -10,6 +10,11 @@ import time
 import threading
 
 logger = logging.getLogger(__name__)
+
+
+class CancelledError(Exception):
+    """Raised when a task is cancelled via the cancellation flag. Phase 7."""
+    pass
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass
 
@@ -300,18 +305,32 @@ class GraphBuilderService:
         chunks: List[str],
         batch_size: int = 3,
         progress_callback: Optional[Callable] = None,
-        max_batch_retries: int = 3
+        max_batch_retries: int = 3,
+        cancel_check: Optional[Callable[[], bool]] = None,
     ) -> List[str]:
         """分批添加文本到图谱，返回所有 episode 的 uuid 列表。
 
         Each batch is retried independently with exponential backoff.
         Completed batch UUIDs are accumulated incrementally so partial
         progress survives a later batch failure.
+
+        If `cancel_check` is provided, it's called at each batch boundary;
+        if it returns True, the loop exits and raises CancelledError.
         """
         episode_uuids = []
         total_chunks = len(chunks)
 
         for i in range(0, total_chunks, batch_size):
+            # Phase 7: cancellation check at batch boundary
+            if cancel_check is not None and cancel_check():
+                logger.info(
+                    f"Graph build cancelled by user at batch {i // batch_size + 1}; "
+                    f"{len(episode_uuids)} episodes already added to Zep."
+                )
+                raise CancelledError(
+                    f"Build cancelled after {i // batch_size + 1} batches"
+                )
+
             batch_chunks = chunks[i:i + batch_size]
             batch_num = i // batch_size + 1
             total_batches = (total_chunks + batch_size - 1) // batch_size

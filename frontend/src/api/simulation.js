@@ -185,3 +185,66 @@ export const getSimulationHistory = (limit = 20) => {
   return service.get('/api/simulation/history', { params: { limit } })
 }
 
+// ============== Phase 3: Token estimation & tracking ==============
+
+/**
+ * Pre-flight token estimate for a planned simulation.
+ * @param {Object} data - { agents, rounds, document_chars, report_sections? }
+ */
+export const estimateTokens = (data) => {
+  return service.post('/api/simulation/estimate', data)
+}
+
+/**
+ * Get actual token usage for a simulation.
+ * @param {string} simulationId
+ */
+export const getTokenUsage = (simulationId) => {
+  return service.get(`/api/simulation/token-usage/${simulationId}`)
+}
+
+// ============== Phase 4: Multi-provider pool ==============
+
+/** Get the configured multi-provider pool (no probing). */
+export const getProviderPool = () => {
+  return service.get('/api/simulation/providers/pool')
+}
+
+/** Probe all providers and return health results. */
+export const probeProviders = () => {
+  return service.post('/api/simulation/providers/probe', {})
+}
+
+/**
+ * Preview agent-to-provider allocation.
+ * @param {Object} data - { agent_count, seed?, only_reachable? }
+ */
+export const allocateProviders = (data) => {
+  return service.post('/api/simulation/providers/allocate', data)
+}
+
+// ============== Phase 5: Capability detection ==============
+
+/** List cached provider capability records. */
+export const getProviderCapabilities = () => {
+  return service.get('/api/simulation/providers/capabilities')
+}
+
+/**
+ * Force-probe capabilities for a specific (base_url, model).
+ * @param {Object} data - { base_url, model, api_key }
+ */
+export const probeCapability = (data) => {
+  return service.post('/api/simulation/providers/capabilities/probe', data)
+}
+
+// ============== Phase 6: Multi-model assignment ==============
+
+/**
+ * Get the agent->provider assignment for a multi-provider simulation.
+ * @param {string} simulationId
+ */
+export const getAgentAssignment = (simulationId) => {
+  return service.get(`/api/simulation/assignment/${simulationId}`)
+}
+

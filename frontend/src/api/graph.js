@@ -68,3 +68,15 @@ export function getProject(projectId) {
     method: 'get'
   })
 }
+
+/**
+ * Phase 7: cancel a running task (e.g., graph build).
+ * The task stops at the next batch boundary; partial progress is preserved.
+ * @param {String} taskId
+ */
+export function cancelTask(taskId) {
+  return service({
+    url: `/api/graph/task/${taskId}/cancel`,
+    method: 'post'
+  })
+}

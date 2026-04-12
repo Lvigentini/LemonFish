@@ -267,22 +267,34 @@ The solution is a **subprocess-side monkey-patch**: wrap the two `generate_*_age
 
 ---
 
-## Phase 7 — Quality-of-Life Improvements (ongoing)
+## Phase 7 — Quality-of-Life Improvements (v0.9.0 partially shipped)
 
 Backlog items that are self-contained and can be picked up anytime.
 
-| # | Task | Source |
-|---|------|--------|
-| 7.1 | Document quality scoring before ontology generation (estimate ontology richness from entity density) | ontology guide open questions |
-| 7.2 | Stop/resume capability for ontology and graph build steps (currently no cancellation) | resilience audit |
-| 7.3 | Orphan project cleanup on failed ontology generation | resilience audit |
-| 7.4 | Simulation subprocess state reconciliation after server restart | resilience audit |
-| 7.5 | `_wait_for_episodes` should log Zep API errors instead of silently passing | resilience audit |
-| 7.6 | Structured input mode (CSV of stakeholders) alongside unstructured docs | ontology guide |
-| 7.7 | `/llm-provider-tracker audit` automation as a GitHub Action | llm_providers.md |
-| 7.8 | User-facing cost warning when picking a paid provider at high agent counts | budget planning |
-| 7.9 | Dry-run mode (estimate without running) | budget planning |
-| 7.10 | Per-step token budgets in `state.json` for partial resume | Phase 3 follow-up |
+| # | Task | Source | Status |
+|---|------|--------|--------|
+| 7.1 | Document quality scoring before ontology generation | ontology guide | 📋 |
+| 7.2 | **Stop/cancel for graph build task** (TaskManager cancel events + `/task/<id>/cancel` endpoint + batch-boundary checks) | resilience audit | ✅ |
+| 7.3 | **Orphan project cleanup on ontology generation failure** | resilience audit | ✅ |
+| 7.4 | Simulation subprocess state reconciliation after server restart | resilience audit | 📋 |
+| 7.5 | `_wait_for_episodes` log Zep API errors | resilience audit | 📋 |
+| 7.6 | Structured input mode (CSV of stakeholders) | ontology guide | 📋 |
+| 7.7 | `/llm-provider-tracker audit` as GitHub Action | llm_providers.md | 📋 |
+| 7.8 | Cost warning for paid providers at high agent counts | budget planning | 📋 |
+| 7.9 | **Dry-run mode** (estimate without running) — via the pre-flight modal | budget planning | ✅ |
+| 7.10 | Per-step token budgets in `state.json` for partial resume | Phase 3 follow-up | 📋 |
+| 7.11 | **Frontend pre-flight modal** with estimate, cost tiers, provider pool | Phase 3 UX | ✅ |
+| 7.12 | **Frontend API client** for Phase 3/4/5/6 endpoints | Phase 3-6 UX | ✅ |
+
+### Shipped in v0.9.0
+
+- **`PreflightModal.vue`**: full-featured modal showing per-step token breakdown, 6-tier cost estimates, and provider pool status. Shown automatically when clicking "Start simulation" in Step 2.
+- **`api/simulation.js` extensions**: `estimateTokens`, `getTokenUsage`, `getProviderPool`, `probeProviders`, `allocateProviders`, `getProviderCapabilities`, `probeCapability`, `getAgentAssignment`.
+- **`api/graph.js` `cancelTask`**: frontend hook for the new cancel endpoint.
+- **`TaskStatus.CANCELLED`** + `TaskManager.request_cancel / is_cancelled / cancel_task`: cancellation event infrastructure, safe to call from any thread.
+- **`graph_builder.CancelledError`** + cancel_check callback: graph build loop checks at every batch boundary and raises on cancel. Partial progress (episodes already sent to Zep) is preserved.
+- **`/api/graph/task/<task_id>/cancel`**: REST endpoint to request cancellation.
+- **Orphan cleanup**: ontology generation failure now deletes the half-built project record so the project list stays clean.
 
 ---
 
@@ -326,7 +338,8 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
 | v0.5.0 | Phase 3 (token tracking) | ✅ |
 | v0.6.0 | Phase 4 (multi-provider pool foundation) | 🚧 shipped without OASIS routing |
 | v0.7.0 | Phase 5 (capability detection) | ✅ |
-| v0.8.0 (current) | Phase 6 (multi-model personas) | ✅ |
-| v1.0.0 | Full feature set, stable API | 💡 |
+| v0.8.0 | Phase 6 (multi-model personas) | ✅ |
+| v0.9.0 (current) | Phase 7 (QoL: pre-flight modal, cancel, orphan cleanup) | ✅ |
+| v1.0.0 | Full feature set, stable API + live end-to-end tested | 💡 |
 
 Versions are indicative, not deadlines. Features may ship sooner if they unlock testable value.
