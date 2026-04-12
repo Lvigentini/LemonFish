@@ -55,6 +55,11 @@ backend/logs/
 
 # 上传文件
 backend/uploads/
+# Root-level uploads/ gets created if a user accidentally runs a compose
+# file that uses `./uploads:/app/backend/uploads` from the repo root.
+# The CLI's bundled compose is designed for a *separate* working directory,
+# so this stray is only possible during dev testing.
+/uploads/
 
 # Docker 数据
 data/

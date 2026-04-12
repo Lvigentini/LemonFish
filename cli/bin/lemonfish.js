@@ -323,33 +323,40 @@ function cmdStop() {
 
 async function cmdStatus() {
   ensureDockerAvailable();
-  const ps = runCompose(['ps', '--format', 'json'], { capture: true });
 
-  let containerRunning = false;
-  let containerState = 'not found';
-  if (ps.status === 0 && ps.stdout.trim()) {
-    try {
-      // `docker compose ps --format json` emits one JSON object per line
+  // Compose view: only sees containers managed by the bundled compose file.
+  // A container started via a different compose project (e.g. the repo's
+  // docker-compose.slim.yml used for local dev) will appear as "not found"
+  // here even though the backend is perfectly healthy.
+  let composeManaged = false;
+  let composeState = 'not managed by bundled compose';
+  try {
+    const ps = runCompose(['ps', '--format', 'json'], { capture: true });
+    if (ps.status === 0 && ps.stdout.trim()) {
       const lines = ps.stdout.trim().split('\n');
       for (const line of lines) {
         const obj = JSON.parse(line);
         if (obj.Service === 'mirofish' || obj.Name === 'mirofish') {
-          containerRunning = obj.State === 'running';
-          containerState = obj.State || 'unknown';
+          composeManaged = obj.State === 'running';
+          composeState = obj.State || 'unknown';
           break;
         }
       }
-    } catch { /* ignore parse errors, fall through to 'not found' */ }
-  }
+    }
+  } catch { /* compose ps failed — treat as "not managed" */ }
 
+  // Backend health: check via HTTP *independently* of compose visibility.
+  // An externally-managed container is still a valid "running" state.
   let backendHealthy = false;
+  try {
+    const h = await httpGet('/health');
+    backendHealthy = h.ok;
+  } catch { backendHealthy = false; }
+
+  // Research module: same independence principle.
   let researchEnabled = false;
   let availability = null;
-  if (containerRunning) {
-    try {
-      const h = await httpGet('/health');
-      backendHealthy = h.ok;
-    } catch { backendHealthy = false; }
+  if (backendHealthy) {
     try {
       const r = await httpGet('/api/research/availability');
       if (r.ok) {
@@ -359,8 +366,16 @@ async function cmdStatus() {
     } catch { /* research module probably disabled */ }
   }
 
+  // "Running" = backend is reachable OR compose sees it. Compose-only is a
+  // partial state that shouldn't happen in practice (container starting up).
+  const running = backendHealthy || composeManaged;
+
   const status = {
-    container: { running: containerRunning, state: containerState },
+    container: {
+      running,
+      compose_managed: composeManaged,
+      compose_state: composeState,
+    },
     backend: { healthy: backendHealthy, url: BACKEND_BASE },
     frontend: { url: FRONTEND_BASE },
     research: { enabled: researchEnabled, runners: availability?.runners || [] },
@@ -371,7 +386,13 @@ async function cmdStatus() {
     return;
   }
 
-  log(`Container:  ${containerRunning ? '✓ running' : `✗ ${containerState}`}`);
+  if (backendHealthy && !composeManaged) {
+    log(`Container:  ✓ running (externally managed, not via lemonfish-cli)`);
+  } else if (composeManaged) {
+    log(`Container:  ✓ running (lemonfish-cli managed)`);
+  } else {
+    log(`Container:  ✗ ${composeState}`);
+  }
   log(`Backend:    ${backendHealthy ? `✓ healthy (${BACKEND_BASE})` : '✗ unreachable'}`);
   log(`Frontend:   ${FRONTEND_BASE}`);
   if (researchEnabled) {
@@ -381,11 +402,11 @@ async function cmdStatus() {
       const reason = r.reason ? ` — ${r.reason}` : '';
       log(`  ${icon} ${r.name}${reason}`);
     }
-  } else if (containerRunning) {
+  } else if (running) {
     log('Research:   ✗ disabled (set RESEARCH_ENABLED=true in .env to enable)');
   }
 
-  if (!containerRunning) process.exit(10);
+  if (!running) process.exit(10);
   if (!backendHealthy) process.exit(11);
 }
 

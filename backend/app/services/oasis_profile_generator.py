@@ -1153,9 +1153,11 @@ Rules:
                     
                     if progress_callback:
                         progress_callback(
-                            current, 
-                            total, 
-                            f"已完成 {current}/{total}: {entity.name}（{entity_type}）"
+                            current,
+                            total,
+                            t('progress.profileProgress',
+                              current=current, total=total,
+                              entity=entity.name, entityType=entity_type)
                         )
                     
                     if error:

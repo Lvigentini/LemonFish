@@ -23,7 +23,8 @@
     "minutes": "Minuten",
     "rounds": "Runden",
     "items": "Einträge",
-    "files": "Dateien"
+    "files": "Dateien",
+    "inProgress": "In Bearbeitung"
   },
   "meta": {
     "title": "MiroFish - Alles vorhersagen",
@@ -478,7 +479,8 @@
     "readingGraphEntities": "Graph-Entitäten werden gelesen",
     "generatingProfiles": "Agent-Profile werden generiert",
     "generatingSimConfig": "Simulationskonfiguration wird generiert",
-    "preparingScripts": "Skripte werden vorbereitet"
+    "preparingScripts": "Skripte werden vorbereitet",
+    "profileProgress": "Fertig {current}/{total}: {entity} ({entityType})"
   },
   "log": {
     "preparingGoBack": "Rückkehr zu Schritt 2 wird vorbereitet, Simulation wird geschlossen...",

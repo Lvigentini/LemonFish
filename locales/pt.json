@@ -23,7 +23,8 @@
     "minutes": "minutos",
     "rounds": "rodadas",
     "items": "itens",
-    "files": "arquivos"
+    "files": "arquivos",
+    "inProgress": "Em progresso"
   },
   "meta": {
     "title": "MiroFish - Preveja Tudo",
@@ -478,7 +479,8 @@
     "readingGraphEntities": "Lendo Entidades do Grafo",
     "generatingProfiles": "Gerando Perfis de Agent",
     "generatingSimConfig": "Gerando Configuração de Simulação",
-    "preparingScripts": "Preparando Scripts"
+    "preparingScripts": "Preparando Scripts",
+    "profileProgress": "Concluído {current}/{total}: {entity} ({entityType})"
   },
   "log": {
     "preparingGoBack": "Preparando retorno à Etapa 2, fechando simulação...",

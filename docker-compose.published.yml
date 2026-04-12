@@ -29,8 +29,9 @@ services:
     restart: unless-stopped
     volumes:
       # Persist project data, research task state, and token usage logs
-      # between container restarts. Host path is created if missing.
-      - ./uploads:/app/backend/uploads
+      # between container restarts. Uses the same host path as the dev
+      # compose (docker-compose.slim.yml) so the two can share data.
+      - ./backend/uploads:/app/backend/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:5001/health || exit 1"]
       interval: 30s

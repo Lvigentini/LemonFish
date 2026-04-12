@@ -23,7 +23,8 @@
     "minutes": "minutes",
     "rounds": "tours",
     "items": "éléments",
-    "files": "fichiers"
+    "files": "fichiers",
+    "inProgress": "En cours"
   },
   "meta": {
     "title": "MiroFish - Prédire l'avenir",
@@ -478,7 +479,8 @@
     "readingGraphEntities": "Lecture des entités du graphe",
     "generatingProfiles": "Génération des profils Agent",
     "generatingSimConfig": "Génération de la configuration de simulation",
-    "preparingScripts": "Préparation des scripts"
+    "preparingScripts": "Préparation des scripts",
+    "profileProgress": "Terminé {current}/{total} : {entity} ({entityType})"
   },
   "log": {
     "preparingGoBack": "Préparation du retour à l'étape 2, fermeture de la simulation...",

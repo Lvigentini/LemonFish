@@ -20,7 +20,12 @@ services:
       - "5001:5001"
     restart: unless-stopped
     volumes:
+      # Persist project data, research task state, and token usage logs
+      # in an uploads/ subdirectory of wherever the user runs lemonfish.
       - ./uploads:/app/backend/uploads
+      # NOTE: the bundled CLI compose uses a relative path from the user's
+      # current working directory (not the LemonFish repo). So if you run
+      # `lemonfish start` from ~/my-project, data lives in ~/my-project/uploads.
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:5001/health || exit 1"]
       interval: 30s
