@@ -612,21 +612,27 @@ class SimulationConfigGenerator:
         try:
             return self._call_llm_with_retry(prompt, system_prompt)
         except Exception as e:
-            logger.warning(f"时间配置LLM生成失败: {e}, 使用默认配置")
+            logger.warning(f"Time config LLM generation failed: {e}, using default")
             return self._get_default_time_config(num_entities)
-    
+
     def _get_default_time_config(self, num_entities: int) -> Dict[str, Any]:
-        """获取默认时间配置（中国人作息）"""
+        """Return a generic default time config.
+
+        The hour buckets below follow a common weekday rhythm (work hours
+        9-18, evening peak 19-22, overnight off-peak 0-5). This is a
+        fallback only — the LLM normally generates a rhythm tailored to
+        the simulation's target audience.
+        """
         return {
             "total_simulation_hours": 72,
-            "minutes_per_round": 60,  # 每轮1小时，加快时间流速
+            "minutes_per_round": 60,  # 1 hour per round, speeds up simulated time
             "agents_per_hour_min": max(1, num_entities // 15),
             "agents_per_hour_max": max(5, num_entities // 5),
             "peak_hours": [19, 20, 21, 22],
             "off_peak_hours": [0, 1, 2, 3, 4, 5],
             "morning_hours": [6, 7, 8],
             "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-            "reasoning": "使用默认中国人作息配置（每轮1小时）"
+            "reasoning": "Default time config (1 hour per round, generic weekday rhythm)"
         }
     
     def _parse_time_config(self, result: Dict[str, Any], num_entities: int) -> TimeSimulationConfig:
@@ -729,12 +735,12 @@ class SimulationConfigGenerator:
         try:
             return self._call_llm_with_retry(prompt, system_prompt)
         except Exception as e:
-            logger.warning(f"事件配置LLM生成失败: {e}, 使用默认配置")
+            logger.warning(f"Event config LLM generation failed: {e}, using default")
             return {
                 "hot_topics": [],
                 "narrative_direction": "",
                 "initial_posts": [],
-                "reasoning": "使用默认配置"
+                "reasoning": "Default event config (LLM generation fell back to empty defaults)"
             }
     
     def _parse_event_config(self, result: Dict[str, Any]) -> EventConfig:
