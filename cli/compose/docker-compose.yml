@@ -1,0 +1,29 @@
+# ============================================================
+# Bundled compose file for the lemonfish-cli npm package
+# ============================================================
+# This file is copied from the repo's docker-compose.published.yml
+# and shipped inside the npm package so users who install via
+# `npm install -g lemonfish-cli` do not need to clone the repo.
+#
+# The CLI writes the user's .env to the working directory the first
+# time `lemonfish setup` runs and reads it from there on every
+# subsequent invocation.
+
+services:
+  mirofish:
+    image: ghcr.io/lvigentini/mirofish:latest
+    container_name: mirofish
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+      - "5001:5001"
+    restart: unless-stopped
+    volumes:
+      - ./uploads:/app/backend/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5001/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

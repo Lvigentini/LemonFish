@@ -1,0 +1,39 @@
+# ============================================================
+# Published image compose — pulls from GHCR instead of building
+# ============================================================
+# This file is consumed by:
+#   1. Users who want to run MiroFish [LemonFish] without cloning the repo
+#   2. The lemonfish-cli npm package (which bundles a copy in cli/compose/)
+#   3. The ClawHub skill install step
+#
+# Usage:
+#     # Pull the published slim image
+#     docker compose -f docker-compose.published.yml up -d
+#
+# The image is built and pushed by .github/workflows/docker-image.yml on
+# every git tag. After the first successful workflow run, the GHCR package
+# visibility must be changed to Public in the repo's Packages settings.
+#
+# For local development from source, use docker-compose.slim.yml instead
+# (it references `build: .` and builds from Dockerfile.slim locally).
+
+services:
+  mirofish:
+    image: ghcr.io/lvigentini/mirofish:latest
+    container_name: mirofish
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+      - "5001:5001"
+    restart: unless-stopped
+    volumes:
+      # Persist project data, research task state, and token usage logs
+      # between container restarts. Host path is created if missing.
+      - ./uploads:/app/backend/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5001/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

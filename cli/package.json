@@ -1,0 +1,44 @@
+{
+  "name": "lemonfish-cli",
+  "version": "1.0.3",
+  "description": "CLI for MiroFish [LemonFish] — multi-agent prediction engine. Manages the Docker container lifecycle and drives the research-from-prompt API so agents can run predictions from a single command.",
+  "keywords": [
+    "multi-agent",
+    "simulation",
+    "prediction",
+    "llm",
+    "agent",
+    "knowledge-graph",
+    "social-simulation",
+    "openclaw",
+    "clawhub",
+    "agentskills"
+  ],
+  "homepage": "https://github.com/Lvigentini/LemonFish",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lvigentini/LemonFish.git",
+    "directory": "cli"
+  },
+  "bugs": {
+    "url": "https://github.com/Lvigentini/LemonFish/issues"
+  },
+  "license": "AGPL-3.0",
+  "author": "Lorenzo Vigentini",
+  "type": "module",
+  "bin": {
+    "lemonfish": "./bin/lemonfish.js"
+  },
+  "files": [
+    "bin/",
+    "compose/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

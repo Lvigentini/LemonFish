@@ -1,5 +1,15 @@
 name: Build and push Docker image
 
+# Builds the slim multi-stage image (Dockerfile.slim) and pushes it to GHCR
+# on every git tag. The published image is consumed by:
+#   - docker-compose.published.yml (for users who want to pull, not build)
+#   - the lemonfish-cli npm package (cli/compose/docker-compose.yml)
+#   - the ClawHub skill installation path
+#
+# Required manual setup after the first successful run:
+#   1. GitHub repo → Settings → Packages → mirofish → Change visibility → Public
+#   2. Verify with: `docker pull ghcr.io/lvigentini/mirofish:latest`
+
 on:
   push:
     tags: ["*"]
@@ -39,11 +49,14 @@ jobs:
             type=sha
             type=raw,value=latest
 
-      - name: Build and push
+      - name: Build and push (slim image, multi-platform)
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile.slim
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
