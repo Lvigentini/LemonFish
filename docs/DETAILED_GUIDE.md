@@ -116,8 +116,14 @@ lemonfish/
 ├── .env                      # Configuration (created by setup.sh)
 ├── locales/                  # Translation files (zh, en, es)
 ├── docs/
-│   ├── ARCHITECTURE.md       # Full technical deep-dive
-│   └── new_features_planning.md
+│   ├── ARCHITECTURE.md              # Full technical deep-dive
+│   ├── DETAILED_GUIDE.md            # This file
+│   ├── personality_frameworks.md    # Big Five + organisational archetypes
+│   ├── oasis_dev.md                 # OASIS engine developer notes
+│   ├── llm_providers.md             # Verified provider catalogue
+│   ├── llm_budget_planning.md       # Token consumption formulas
+│   ├── document_and_ontology_guide.md  # Seed document quality guide
+│   └── research_module.md           # Phase 8 research-from-prompt guide
 ├── frontend/                 # Vue 3 + Vite
 └── backend/                  # Flask + Python 3.11
     ├── app/
@@ -129,16 +135,17 @@ lemonfish/
 
 ---
 
-## Roadmap: Multi-Model Persona Assignment
+## Multi-Model Persona Assignment
 
-The biggest planned feature: randomise LLM assignment across agents to break monoculture artifacts. A simulation with 200 agents on 4 different LLMs produces more authentic variation than 200 agents all running on the same model.
+Agents can be routed across multiple LLM providers in a single simulation to break monoculture artefacts from everyone sharing one model. Configure a provider pool via `LLM_PROVIDERS=groq,google,ollama` (plus per-provider blocks — see [`.env.example`](../.env.example) Section 4) and each agent is randomly assigned to a provider at simulation start.
 
-Design principles:
-- **Random assignment**, not role-based — no assumptions about model capability
-- **Model lock per agent** — once assigned, never changes mid-simulation
-- **Skip turn, don't swap** — if an agent's model is rate-limited, the agent goes silent rather than speaking with a different cognitive architecture
+Design principles (implemented in `backend/scripts/oasis_model_patch.py`):
 
-See [new_features_planning.md](./new_features_planning.md) for full design.
+- **Random assignment**, not role-based — no unjustified assumptions about which models fit which social roles
+- **Model lock per agent** — once assigned at simulation start, never changes mid-run
+- **Skip turn, don't swap** — if an agent's provider hits rate limits, the agent's action fails for that round rather than speaking with a different cognitive architecture
+
+Reproducibility: set `LLM_MULTI_PROVIDER_SEED=<integer>` to make allocation deterministic across runs.
 
 ---
 

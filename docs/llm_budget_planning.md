@@ -4,7 +4,7 @@
 
 ## Token Consumption Model
 
-There is **no token tracking** in the codebase currently. All estimates below are derived from measuring the actual prompt templates.
+The estimates below are derived from measuring the actual prompt templates across all five pipeline steps. Live token tracking is wired through every step — the `TokenTracker` service records `response.usage` on every LLM call and persists per-simulation tallies to `backend/uploads/token_usage/{simulation_id}.json`. The pre-flight modal in the UI uses these formulas to predict cost before a user clicks Start; post-simulation the actual vs estimated breakdown is visible via `GET /api/simulation/token-usage/<simulation_id>`.
 
 ### Per-Step Breakdown
 
@@ -147,69 +147,72 @@ Small local models (7B-14B) may not follow complex persona instructions as faith
 
 ---
 
-## Proposed: Multi-Provider Token Allocator
+## Multi-Provider Token Allocator
 
-### Design
+The allocator is implemented across `backend/app/services/provider_pool.py`, `agent_model_assignment.py`, and `backend/scripts/oasis_model_patch.py`. Here's how it works end-to-end:
 
-Before simulation starts, the allocator:
+### Pre-flight (simulation setup)
 
-1. **Probes** each configured provider with a minimal API call to check availability and measure response time
-2. **Queries** rate limits (where APIs expose this, e.g., Groq returns `x-ratelimit-remaining` headers)
-3. **Estimates** total token budget needed using the formula above (based on N agents, R rounds)
-4. **Allocates** agents to providers proportionally:
-   - Providers with higher daily token budgets get more agents
-   - Providers with lower latency get priority for high-activity agents
-   - Ollama gets agents if API budgets are insufficient
-5. **Assigns** each agent a provider+model at simulation start (locked for duration)
-6. **Monitors** during simulation:
-   - Tracks consumed tokens per provider (read `response.usage` from API responses)
-   - If a provider hits rate limits, its agents skip turns (never reassign to different model)
-   - Logs per-provider consumption for post-simulation analysis
+1. **Probe** — `ProviderPool.probe_all()` pings each configured provider with a 5-token sample call and records reachability, latency, and whether the `response.usage` field is returned.
+2. **Estimate** — `token_estimator.estimate()` runs the formula above against the planned N agents / R rounds / D document chars and produces a per-step breakdown plus cost projections across six pricing tiers. This is what the pre-flight modal in the UI shows.
+3. **Allocate** — `ProviderPool.allocate_agents(agent_ids, seed, only_reachable)` uniformly-at-random assigns each agent to a provider. The assignment is seeded (`LLM_MULTI_PROVIDER_SEED`) for reproducibility.
+4. **Persist** — the allocation is written to `agent_model_assignments.json` in the simulation directory.
+
+### Runtime (during simulation)
+
+5. **Subprocess routing** — the OASIS simulation subprocess picks up `MIROFISH_AGENT_MODEL_ASSIGNMENTS` from its environment. `oasis_model_patch.py` monkey-patches `generate_reddit_agent_graph` / `generate_twitter_agent_graph` so each `SocialAgent` is constructed with its own `BaseModelBackend` instance rather than a shared one. No upstream OASIS fork required.
+6. **Token tracking** — `TokenTracker` persists per-simulation, per-step, per-model consumption. From inside the subprocess, `token_instrumentation.py` monkey-patches the openai SDK to record usage against the same file the parent Flask process writes to.
+7. **Agents are locked to their assigned provider** — if that provider hits rate limits mid-simulation, the agent skips its turn rather than swapping model. This preserves positional integrity: an agent's "voice" never changes mid-run.
 
 ### Configuration
 
 ```env
-# Multi-provider setup (comma-separated)
 LLM_PROVIDERS=groq,google,ollama
+
 LLM_GROQ_API_KEY=gsk_...
 LLM_GROQ_BASE_URL=https://api.groq.com/openai/v1
-LLM_GROQ_MODELS=llama-3.1-8b-instant,llama-4-scout-17b-16e-instruct
+LLM_GROQ_MODEL=llama-3.1-8b-instant
 LLM_GROQ_DAILY_TOKEN_BUDGET=1000000
+
 LLM_GOOGLE_API_KEY=AIza...
 LLM_GOOGLE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
-LLM_GOOGLE_MODELS=gemini-2.5-flash
+LLM_GOOGLE_MODEL=gemini-3-flash-preview
 LLM_GOOGLE_DAILY_TOKEN_BUDGET=1000000
+
+LLM_OLLAMA_API_KEY=ollama
 LLM_OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
-LLM_OLLAMA_MODELS=gemma2:9b,mistral:7b
+LLM_OLLAMA_MODEL=llama3.2
 LLM_OLLAMA_DAILY_TOKEN_BUDGET=999999999
+
+# Reproducibility (optional)
+LLM_MULTI_PROVIDER_SEED=42
 ```
 
-### Allocation Algorithm
+### Daily budget tracking
 
-```
-For each simulation:
-  1. total_needed = estimate_tokens(N, R, D, S)
-  2. For each provider:
-       available = min(daily_budget - consumed_today, remaining_rate_limit)
-  3. Sort providers by available tokens (descending)
-  4. Assign agents round-robin across providers, weighted by available budget
-  5. Store assignment in agent profile (agent.provider, agent.model)
-  6. Lock assignments for simulation duration
-```
+`GET /api/simulation/budget/daily` aggregates 24-hour consumption across all simulations and compares it to each provider's `DAILY_TOKEN_BUDGET`. Response includes per-endpoint `total_tokens`, `remaining`, `percent_used`, and a warnings list for providers at or above 80% usage.
 
-### Implementation Priority
+### Cost warnings
 
-1. **First**: Add token tracking to LLMClient (read `response.usage`)
-2. **Second**: Add pre-simulation token estimation (the formula)
-3. **Third**: Multi-provider config and agent assignment
-4. **Fourth**: Runtime monitoring and skip-turn logic
+The pre-flight modal displays tiered warnings based on the estimated token cost:
+
+- **Medium warning** when DeepSeek equivalent cost > $2
+- **High warning** when Claude Sonnet equivalent cost > $5
+- **Danger warning** when total tokens > 10M
+
+Users see these before clicking Start and can back off to a smaller scenario or switch providers.
 
 ---
 
-## Open Questions
+## API surface
 
-- Should the estimation be shown to the user before starting? ("This simulation will use approximately 3.7M tokens across 3 providers. Estimated time: 45 minutes. Proceed?")
-- Should there be a "dry run" mode that estimates cost without running?
-- How to handle providers that don't return usage data in responses?
-- Should we cache and reuse profile generation across runs with the same seed documents?
-- Rate limit headers vary by provider — need per-provider parsing logic
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/simulation/estimate` | Pre-flight token and cost estimate for a planned simulation |
+| `GET /api/simulation/token-usage/<simulation_id>` | Actual usage per step for a running or completed simulation |
+| `GET /api/simulation/providers/pool` | Configured multi-provider pool |
+| `POST /api/simulation/providers/probe` | Live probe of every provider |
+| `POST /api/simulation/providers/allocate` | Preview an agent-to-provider allocation (seeded or random) |
+| `GET /api/simulation/providers/capabilities` | Cached capability detection results (JSON mode support, etc.) |
+| `GET /api/simulation/assignment/<simulation_id>` | Agent-to-provider assignment for a running simulation (API keys redacted) |
+| `GET /api/simulation/budget/daily` | 24-hour consumption vs per-provider daily budgets |

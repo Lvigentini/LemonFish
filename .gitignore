@@ -58,3 +58,8 @@ backend/uploads/
 
 # Docker 数据
 data/
+
+# Private planning notes — implementation plan, feature brainstorming,
+# and anything that's "my thinking" rather than public reference.
+# These files live in docs/internal/ locally but are never committed.
+docs/internal/

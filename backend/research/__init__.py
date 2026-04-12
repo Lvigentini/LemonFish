@@ -9,8 +9,7 @@ Public surface:
     - is_enabled() -> bool        : check whether the module should be active
     - register_blueprint(app)     : mount the Flask blueprint on a Flask app
 
-See docs/implementation_plan.md Phase 8 and docs/new_features_planning.md
-for the full design.
+See docs/research_module.md for the user-facing guide.
 """
 
 from .config import is_enabled

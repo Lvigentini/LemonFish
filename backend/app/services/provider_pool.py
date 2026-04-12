@@ -1,16 +1,14 @@
 """
-Multi-Provider Pool & Probe (Phase 4)
+Multi-Provider Pool & Probe
 
 Manages a pool of LLM providers and answers two questions:
   1. Which providers are currently reachable?
   2. Given N items (agents, calls), how do we distribute them across the pool?
 
-This is the foundation for Phase 6 (multi-model persona assignment).
-The actual per-agent simulation routing still needs OASIS integration
-work — see docs/implementation_plan.md Phase 6 and
-docs/new_features_planning.md for the full design.
+Foundation for the multi-model persona assignment feature. Per-agent
+routing into OASIS is wired via backend/scripts/oasis_model_patch.py.
 
-This phase delivers:
+This module delivers:
   - Provider pool config parsing (from Config.get_provider_pool)
   - Provider reachability probe (ping each provider with a tiny call)
   - Random agent-to-provider allocation (seeded, reproducible)
@@ -144,7 +142,10 @@ class ProviderPool:
             dict mapping agent_id -> provider name
 
         Design note: assignment is uniform random, NOT role-based.
-        See docs/new_features_planning.md for the rationale.
+        Rationale: uniform random breaks monoculture artefacts from all
+        agents sharing a single model. Role-based assignment is explicitly
+        rejected — it would require unjustified assumptions about which
+        models fit which social roles.
         """
         candidates = self.entries
         if only_reachable:

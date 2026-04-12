@@ -34,7 +34,6 @@ class Config:
 
     # Per-step LLM overrides — each step can optionally use a different provider/model.
     # If not set, the step falls back to the primary LLM_* config above.
-    # See docs/implementation_plan.md Phase 2 for rationale.
 
     # Step 1 — Ontology generation (benefits from large-context models like Gemini)
     LLM_ONTOLOGY_API_KEY = os.environ.get('LLM_ONTOLOGY_API_KEY')
