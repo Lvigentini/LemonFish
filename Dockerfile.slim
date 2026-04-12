@@ -32,8 +32,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 WORKDIR /app/backend
 COPY backend/pyproject.toml backend/uv.lock ./
 
-# Install deps from lockfile
-RUN uv sync --frozen
+# Install deps from lockfile, including the Phase 8 research extras
+# (ddgs for the API runner's DuckDuckGo fallback). CLI runners don't
+# need these — they shell out to host-installed tools.
+RUN uv sync --frozen --extra research
 
 # Replace CUDA torch with CPU-only version (saves ~5.8GB)
 RUN uv pip install --reinstall \

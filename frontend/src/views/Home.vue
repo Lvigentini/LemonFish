@@ -2,7 +2,7 @@
   <div class="home-container">
     <!-- 顶部导航栏 -->
     <nav class="navbar">
-      <div class="nav-brand">LEMONFISH <span class="version-pill">v{{ appVersion }}</span></div>
+      <div class="nav-brand">MIROFISH <span class="brand-suffix">[LEMONFISH]</span> <span class="version-pill">v{{ appVersion }}</span></div>
       <div class="nav-links">
         <LanguageSwitcher />
         <a href="https://github.com/Lvigentini/LemonFish" target="_blank" class="github-link">
@@ -44,7 +44,7 @@
         <div class="hero-right">
           <!-- Logo 区域 -->
           <div class="logo-container">
-            <img src="../assets/logo/MiroFish_logo_left.jpeg" alt="MiroFish Logo" class="hero-logo" />
+            <img src="/MiroFish_lemonLogo.jpeg" alt="MiroFish [LemonFish] Logo" class="hero-logo" />
           </div>
           
           <button class="scroll-down-btn" @click="scrollToBottom">
@@ -365,6 +365,14 @@ const goToResearch = () => {
   font-weight: 800;
   letter-spacing: 1px;
   font-size: 1.2rem;
+}
+
+.brand-suffix {
+  font-weight: 500;
+  font-size: 0.7em;
+  color: #DAA520;
+  letter-spacing: 0.5px;
+  margin-left: 4px;
 }
 
 .nav-links {

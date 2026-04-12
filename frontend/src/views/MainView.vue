@@ -3,7 +3,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">LEMONFISH <span class="version-pill">v{{ appVersion }}</span></div>
+        <div class="brand" @click="router.push('/')">MIROFISH <span class="brand-suffix">[LEMONFISH]</span> <span class="version-pill">v{{ appVersion }}</span></div>
       </div>
       
       <div class="header-center">
@@ -478,6 +478,14 @@ onUnmounted(() => {
   font-size: 18px;
   letter-spacing: 1px;
   cursor: pointer;
+}
+
+.brand-suffix {
+  font-weight: 500;
+  font-size: 0.72em;
+  color: #DAA520;
+  letter-spacing: 0.5px;
+  margin-left: 3px;
 }
 
 .version-pill {

@@ -2,7 +2,7 @@
   <div class="process-page">
     <!-- 顶部导航栏 -->
     <nav class="navbar">
-      <div class="nav-brand" @click="goHome">MIROFISH</div>
+      <div class="nav-brand" @click="goHome">MIROFISH <span style="font-weight:500;font-size:0.72em;color:#DAA520;letter-spacing:0.5px;">[LEMONFISH]</span></div>
       
       <!-- 中间步骤指示器 -->
       <div class="nav-center">
