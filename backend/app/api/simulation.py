@@ -2900,6 +2900,40 @@ def clear_capabilities():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@simulation_bp.route('/assignment/<simulation_id>', methods=['GET'])
+def get_agent_assignment(simulation_id: str):
+    """Return the agent->provider assignment for a simulation (if multi-provider)."""
+    try:
+        from pathlib import Path
+        from ..services.agent_model_assignment import load_assignment, get_distribution_summary
+        sim_dir = Path(Config.OASIS_SIMULATION_DATA_DIR) / simulation_id
+        doc = load_assignment(sim_dir)
+        if doc is None:
+            return jsonify({
+                "success": True,
+                "data": {
+                    "configured": False,
+                    "message": "No multi-provider assignment found for this simulation."
+                }
+            })
+        # Strip API keys before returning
+        sanitized = dict(doc)
+        for entry in sanitized.get('assignments', {}).values():
+            if 'api_key' in entry:
+                entry['api_key'] = '***redacted***'
+        sanitized['distribution'] = get_distribution_summary(doc)
+        return jsonify({
+            "success": True,
+            "data": {
+                "configured": True,
+                **sanitized,
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to get assignment: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @simulation_bp.route('/providers/allocate', methods=['POST'])
 def allocate_providers():
     """Preview how agents would be randomly allocated across the pool.

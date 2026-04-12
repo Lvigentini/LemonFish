@@ -435,6 +435,47 @@ class SimulationRunner:
             # Pass simulation_id to subprocess for token usage tracking
             env['MIROFISH_SIMULATION_ID'] = simulation_id
             env['MIROFISH_TOKEN_STEP'] = 'simulation'
+
+            # Phase 6: Multi-provider per-agent model assignment.
+            # If LLM_PROVIDERS is configured, allocate agents to providers
+            # and write the assignment JSON that the subprocess will read.
+            try:
+                from .agent_model_assignment import build_assignment, get_distribution_summary
+                # Count agents from reddit_profiles.json if present
+                reddit_profiles_path = os.path.join(sim_dir, 'reddit_profiles.json')
+                twitter_profiles_path = os.path.join(sim_dir, 'twitter_profiles.csv')
+                agent_count = 0
+                if os.path.exists(reddit_profiles_path):
+                    import json as _json
+                    with open(reddit_profiles_path, 'r', encoding='utf-8') as f:
+                        agent_count = len(_json.load(f))
+                elif os.path.exists(twitter_profiles_path):
+                    import csv as _csv
+                    with open(twitter_profiles_path, 'r', encoding='utf-8') as f:
+                        agent_count = sum(1 for _ in _csv.reader(f)) - 1  # header
+
+                if agent_count > 0:
+                    from pathlib import Path as _Path
+                    import random
+                    seed = int(os.environ.get('LLM_MULTI_PROVIDER_SEED', random.randint(1, 1_000_000)))
+                    assignment_path = build_assignment(
+                        simulation_dir=_Path(sim_dir),
+                        agent_ids=list(range(agent_count)),
+                        seed=seed,
+                        only_reachable=False,
+                    )
+                    if assignment_path is not None:
+                        env['MIROFISH_AGENT_MODEL_ASSIGNMENTS'] = str(assignment_path)
+                        # Load and log distribution
+                        with open(assignment_path, 'r', encoding='utf-8') as f:
+                            doc = _json.load(f)
+                        distribution = get_distribution_summary(doc)
+                        logger.info(
+                            f"Multi-provider mode: {agent_count} agents distributed "
+                            f"as {distribution} (seed={seed})"
+                        )
+            except Exception as assign_err:
+                logger.warning(f"Per-agent model assignment skipped: {assign_err}")
             
             # 设置工作目录为模拟目录（数据库等文件会生成在此）
             # 使用 start_new_session=True 创建新的进程组，确保可以通过 os.killpg 终止所有子进程

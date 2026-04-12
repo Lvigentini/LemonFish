@@ -53,6 +53,13 @@ try:
 except Exception as _e:
     print(f"[warn] token instrumentation failed to install: {_e}")
 
+# Install Phase 6 per-agent model patch (no-op unless MIROFISH_AGENT_MODEL_ASSIGNMENTS set)
+try:
+    from oasis_model_patch import install as _install_oasis_patch
+    _install_oasis_patch()
+except Exception as _e:
+    print(f"[warn] oasis model patch failed to install: {_e}")
+
 
 import re
 

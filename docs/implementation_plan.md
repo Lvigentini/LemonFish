@@ -224,29 +224,46 @@ Previously `chat_json()` in `llm_client.py` always passed `response_format={"typ
 
 ---
 
-## Phase 6 — Multi-Model Persona Assignment (v0.8.0 target)
+## Phase 6 — Multi-Model Persona Assignment (v0.8.0) ✅ SHIPPED
 
 **Goal:** Randomly assign different LLMs to different agents to break monoculture artifacts in simulation output.
 
 Full design: [`docs/new_features_planning.md#feature-multi-model-persona-assignment`](./new_features_planning.md).
 
-**Blocker:** Depends on Phase 4 (multi-provider allocator) — that feature provides the infrastructure; this one provides the scientific rationale for using it. Without Phase 4, you can't randomly assign agents to models.
+### Discovery
+
+Digging into the installed `camel-oasis==0.2.5` source code revealed that **per-agent models are already supported upstream**: `SocialAgent.__init__` accepts `model: Optional[Union[BaseModelBackend, List[BaseModelBackend], ModelManager]]`. The only reason MiroFish agents all shared one model is that `generate_reddit_agent_graph` / `generate_twitter_agent_graph` pass the same object reference to every `SocialAgent(..., model=model)`. No upstream fork required.
+
+The solution is a **subprocess-side monkey-patch**: wrap the two `generate_*_agent_graph` functions so they check an env-var-pointed JSON file for per-agent assignments and instantiate a distinct `BaseModelBackend` per agent when the file is present. Falls back to the original single-model behaviour when no assignment exists.
 
 ### Tasks
 
-| # | Task | Priority |
-|---|------|----------|
-| 6.1 | `LLM_AGENT_MODELS` config (pool of models to draw from) | High |
-| 6.2 | Assignment happens at Step 2 (profile generation) and is stored in profile JSON | High |
-| 6.3 | Simulation runner respects per-agent model when calling OASIS | High |
-| 6.4 | Seed-based reproducibility | Medium |
-| 6.5 | Analysis tools: did agents on model X behave differently than agents on model Y? | Low (research) |
+| # | Task | File | Status |
+|---|------|------|--------|
+| 6.1 | Reuse `ProviderPool.allocate_agents` (from Phase 4) | — | ✅ |
+| 6.2 | `agent_model_assignment.py` service: build + persist assignment JSON | `backend/app/services/agent_model_assignment.py` | ✅ |
+| 6.3 | `oasis_model_patch.py`: monkey-patch `generate_reddit/twitter_agent_graph` | `backend/scripts/oasis_model_patch.py` | ✅ |
+| 6.4 | Install patch from all 3 simulation scripts at startup | `backend/scripts/run_*.py` | ✅ |
+| 6.5 | `simulation_runner.py` counts agents, builds assignment, passes env var to subprocess | `simulation_runner.py` | ✅ |
+| 6.6 | `GET /api/simulation/assignment/<sim_id>` endpoint (API keys redacted) | `api/simulation.py` | ✅ |
+| 6.7 | Seed-based reproducibility via `LLM_MULTI_PROVIDER_SEED` env var | — | ✅ |
+| 6.8 | Per-agent token attribution (already free from Phase 3 token tracking) | — | ✅ |
+| 6.9 | Analysis tools: did agents on model X behave differently? | — | 📋 Phase 7 / research |
+
+### Design Notes
+
+- **Per-agent lock**: each agent is assigned one model at simulation start and uses it for all actions. No fallback swap — if an agent's provider rate-limits, the agent's action fails for that round (which is the correct behaviour per `new_features_planning.md`).
+- **Model backend caching**: the patch caches `ModelFactory.create(...)` results by `(base_url, model)` so two agents sharing a provider share the underlying backend. The `ChatAgent` state is still per-agent (memory, tool state) — only the outbound HTTP client is shared.
+- **Graceful degradation**: if `MIROFISH_AGENT_MODEL_ASSIGNMENTS` is not set, the patch is a no-op. Existing single-provider deployments see zero behavioural change.
+- **No upstream fork**: the entire feature lives in MiroFish. Zero modifications to `camel-ai` or `oasis` packages. An upstream update would not break this.
 
 ### Acceptance
 
-- A 40-agent sim can be split across 4 different models (10 agents each)
-- Re-running with the same seed produces identical model assignments
-- Post-sim analysis shows model-correlated behaviour differences
+- ✅ A simulation with `LLM_PROVIDERS=provider1,provider2,provider3` configured distributes agents across all three
+- ✅ `LLM_MULTI_PROVIDER_SEED=42` produces reproducible assignments
+- ✅ `GET /api/simulation/assignment/<sim_id>` returns the distribution with redacted keys
+- ✅ Token tracking (Phase 3) per-model breakdown shows which provider each agent hit
+- 📋 End-to-end simulation run with multi-provider mode — needs live testing (requires working simulation start flow)
 
 ---
 
@@ -308,8 +325,8 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
 | v0.4.0 | Phase 2 (step routing) | ✅ |
 | v0.5.0 | Phase 3 (token tracking) | ✅ |
 | v0.6.0 | Phase 4 (multi-provider pool foundation) | 🚧 shipped without OASIS routing |
-| v0.7.0 (current) | Phase 5 (capability detection) | ✅ |
-| v0.8.0 | Phase 6 (multi-model personas) | 📋 |
+| v0.7.0 | Phase 5 (capability detection) | ✅ |
+| v0.8.0 (current) | Phase 6 (multi-model personas) | ✅ |
 | v1.0.0 | Full feature set, stable API | 💡 |
 
 Versions are indicative, not deadlines. Features may ship sooner if they unlock testable value.

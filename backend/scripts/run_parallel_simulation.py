@@ -110,6 +110,15 @@ try:
 except Exception as _e:
     print(f"[warn] token instrumentation failed to install: {_e}")
 
+# Install Phase 6 per-agent model patch (routes different agents to
+# different providers). No-op unless MIROFISH_AGENT_MODEL_ASSIGNMENTS
+# env var points to a valid assignments JSON file.
+try:
+    from oasis_model_patch import install as _install_oasis_patch
+    _install_oasis_patch()
+except Exception as _e:
+    print(f"[warn] oasis model patch failed to install: {_e}")
+
 
 class MaxTokensWarningFilter(logging.Filter):
     """过滤掉 camel-ai 关于 max_tokens 的警告（我们故意不设置 max_tokens，让模型自行决定）"""
