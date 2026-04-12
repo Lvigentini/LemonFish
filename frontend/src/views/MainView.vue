@@ -50,7 +50,7 @@
 
       <!-- Right Panel: Step Components -->
       <div class="panel-wrapper right" :style="rightPanelStyle">
-        <!-- Step 1: 图谱构建 -->
+        <!-- Step 1: graph build -->
         <Step1GraphBuild
           v-if="currentStep === 1"
           :currentPhase="currentPhase"
@@ -64,7 +64,7 @@
           @build-cancelled="handleBuildCancelled"
           @retry-build="handleRetryBuild"
         />
-        <!-- Step 2: 环境搭建 -->
+        <!-- Step 2: environment setup -->
         <Step2EnvSetup
           v-else-if="currentStep === 2"
           :projectData="projectData"

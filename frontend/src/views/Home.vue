@@ -1,6 +1,6 @@
 <template>
   <div class="home-container">
-    <!-- 顶部导航栏 -->
+    <!-- top navigation bar -->
     <nav class="navbar">
       <div class="nav-brand">MIROFISH <span class="brand-suffix">[LEMONFISH]</span> <span class="version-pill">v{{ appVersion }}</span></div>
       <div class="nav-links">
@@ -253,7 +253,7 @@
         </div>
       </section>
 
-      <!-- 历史项目数据库 -->
+      <!-- historyprojectdatabase -->
       <HistoryDatabase />
     </div>
   </div>
@@ -327,7 +327,7 @@ const triggerFileInput = () => {
   }
 }
 
-// 处理文件选择
+// processfileselect
 const handleFileSelect = (event) => {
   const selectedFiles = Array.from(event.target.files)
   addFiles(selectedFiles)
@@ -352,7 +352,7 @@ const handleDrop = (e) => {
   addFiles(droppedFiles)
 }
 
-// 添加文件
+// addfile
 const addFiles = (newFiles) => {
   const validFiles = newFiles.filter(file => {
     const ext = file.name.split('.').pop().toLowerCase()
@@ -361,7 +361,7 @@ const addFiles = (newFiles) => {
   files.value.push(...validFiles)
 }
 
-// 移除文件
+// removefile
 const removeFile = (index) => {
   files.value.splice(index, 1)
 }
@@ -657,7 +657,7 @@ const startEntry = () => {
   flex-direction: column;
 }
 
-/* 左侧面板 */
+/* left panel */
 .left-panel {
   flex: 0.8;
 }

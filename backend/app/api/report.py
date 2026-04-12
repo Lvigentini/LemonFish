@@ -20,23 +20,23 @@ from ..utils.locale import t, get_locale, set_locale
 logger = get_logger('mirofish.api.report')
 
 
-# ============== 报告生成接口 ==============
+# ============== report generationinterface ==============
 
 @report_bp.route('/generate', methods=['POST'])
 def generate_report():
     """
-    生成模拟分析报告（异步任务）
+    generatesimulationanalyzereport (asynctask) 
     
     这是一个耗时操作，接口会立即返回task_id，
-    使用 GET /api/report/generate/status 查询进度
+    use GET /api/report/generate/status queryprogress
     
-    请求（JSON）：
+    request (JSON) : 
         {
-            "simulation_id": "sim_xxxx",    // 必填，模拟ID
-            "force_regenerate": false        // 可选，强制重新生成
+            "simulation_id": "sim_xxxx",    // required, simulation ID
+            "force_regenerate": false        // optional, strongrebuildnewgenerate
         }
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -59,7 +59,7 @@ def generate_report():
 
         force_regenerate = data.get('force_regenerate', False)
         
-        # 获取模拟信息
+        # getsimulationinfo
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
         
@@ -84,7 +84,7 @@ def generate_report():
                     }
                 })
         
-        # 获取项目信息
+        # get projectinfo
         project = ProjectManager.get_project(state.project_id)
         if not project:
             return jsonify({
@@ -110,7 +110,7 @@ def generate_report():
         import uuid
         report_id = f"report_{uuid.uuid4().hex[:12]}"
         
-        # 创建异步任务
+        # createasynctask
         task_manager = TaskManager()
         task_id = task_manager.create_task(
             task_type="report_generate",
@@ -124,7 +124,7 @@ def generate_report():
         # Capture locale before spawning background thread
         current_locale = get_locale()
 
-        # 定义后台任务
+        # definitionbackgroundtask
         def run_generate():
             set_locale(current_locale)
             try:
@@ -137,14 +137,14 @@ def generate_report():
                     message=t('api.initReportAgent')
                 )
 
-                # 创建Report Agent
+                # createReport Agent
                 agent = ReportAgent(
                     graph_id=graph_id,
                     simulation_id=simulation_id,
                     simulation_requirement=simulation_requirement
                 )
                 
-                # 进度回调
+                # progresscallback
                 def progress_callback(stage, progress, message):
                     task_manager.update_task(
                         task_id,
@@ -158,7 +158,7 @@ def generate_report():
                     report_id=report_id
                 )
                 
-                # 保存报告
+                # savereport
                 ReportManager.save_report(report)
                 
                 if report.status == ReportStatus.COMPLETED:
@@ -179,7 +179,7 @@ def generate_report():
             finally:
                 TokenTracker.clear_context()
 
-        # 启动后台线程
+        # startbackgroundthread
         thread = threading.Thread(target=run_generate, daemon=True)
         thread.start()
         
@@ -207,15 +207,15 @@ def generate_report():
 @report_bp.route('/generate/status', methods=['POST'])
 def get_generate_status():
     """
-    查询报告生成任务进度
+    queryreport generationtaskprogress
     
-    请求（JSON）：
+    request (JSON) : 
         {
-            "task_id": "task_xxxx",         // 可选，generate返回的task_id
-            "simulation_id": "sim_xxxx"     // 可选，模拟ID
+            "task_id": "task_xxxx",         // optional, generatereturnedtask_id
+            "simulation_id": "sim_xxxx"     // optional, simulation ID
         }
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -276,14 +276,14 @@ def get_generate_status():
         }), 500
 
 
-# ============== 报告获取接口 ==============
+# ============== reportgetinterface ==============
 
 @report_bp.route('/<report_id>', methods=['GET'])
 def get_report(report_id: str):
     """
     获取报告详情
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -325,7 +325,7 @@ def get_report_by_simulation(simulation_id: str):
     """
     根据模拟ID获取报告
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -364,11 +364,11 @@ def list_reports():
     """
     列出所有报告
     
-    Query参数：
+    Queryparameter: 
         simulation_id: 按模拟ID过滤（可选）
-        limit: 返回数量限制（默认50）
+        limit: returnscountrestrict (default50) 
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": [...],
@@ -404,7 +404,7 @@ def download_report(report_id: str):
     """
     下载报告（Markdown格式）
     
-    返回Markdown文件
+    returnsMarkdownfile
     """
     try:
         report = ReportManager.get_report(report_id)
@@ -418,7 +418,7 @@ def download_report(report_id: str):
         md_path = ReportManager._get_report_markdown_path(report_id)
         
         if not os.path.exists(md_path):
-            # 如果MD文件不存在，生成一个临时文件
+            # ifMDfiledoes not exist, generateatemporaryfile
             import tempfile
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
                 f.write(report.markdown_content)
@@ -447,7 +447,7 @@ def download_report(report_id: str):
 
 @report_bp.route('/<report_id>', methods=['DELETE'])
 def delete_report(report_id: str):
-    """删除报告"""
+    """deletereport"""
     try:
         success = ReportManager.delete_report(report_id)
         
@@ -471,7 +471,7 @@ def delete_report(report_id: str):
         }), 500
 
 
-# ============== Report Agent对话接口 ==============
+# ============== Report Agentdialoginterface ==============
 
 @report_bp.route('/chat', methods=['POST'])
 def chat_with_report_agent():
@@ -480,23 +480,23 @@ def chat_with_report_agent():
     
     Report Agent可以在对话中自主调用检索工具来回答问题
     
-    请求（JSON）：
+    request (JSON) : 
         {
-            "simulation_id": "sim_xxxx",        // 必填，模拟ID
+            "simulation_id": "sim_xxxx",        // required, simulation ID
             "message": "请解释一下舆情走向",    // 必填，用户消息
-            "chat_history": [                   // 可选，对话历史
+            "chat_history": [                   // optional, dialoghistory
                 {"role": "user", "content": "..."},
                 {"role": "assistant", "content": "..."}
             ]
         }
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
-                "response": "Agent回复...",
+                "response": "Agentreply...",
                 "tool_calls": [调用的工具列表],
-                "sources": [信息来源]
+                "sources": [infosource]
             }
         }
     """
@@ -519,7 +519,7 @@ def chat_with_report_agent():
                 "error": t('api.requireMessage')
             }), 400
         
-        # 获取模拟和项目信息
+        # getsimulationandproject info
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
         
@@ -573,9 +573,9 @@ def chat_with_report_agent():
 @report_bp.route('/<report_id>/progress', methods=['GET'])
 def get_report_progress(report_id: str):
     """
-    获取报告生成进度（实时）
+    getreport generationprogress (real-time) 
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -583,7 +583,7 @@ def get_report_progress(report_id: str):
                 "progress": 45,
                 "message": "正在生成章节: 关键发现",
                 "current_section": "关键发现",
-                "completed_sections": ["执行摘要", "模拟背景"],
+                "completed_sections": ["executesummary", "simulationbackground"],
                 "updated_at": "2025-12-09T..."
             }
         }
@@ -618,7 +618,7 @@ def get_report_sections(report_id: str):
     
     前端可以轮询此接口获取已生成的章节内容，无需等待整个报告完成
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -627,7 +627,7 @@ def get_report_sections(report_id: str):
                     {
                         "filename": "section_01.md",
                         "section_index": 1,
-                        "content": "## 执行摘要\\n\\n..."
+                        "content": "## executesummary\\n\\n..."
                     },
                     ...
                 ],
@@ -639,7 +639,7 @@ def get_report_sections(report_id: str):
     try:
         sections = ReportManager.get_generated_sections(report_id)
         
-        # 获取报告状态
+        # getreportstatus
         report = ReportManager.get_report(report_id)
         is_complete = report is not None and report.status == ReportStatus.COMPLETED
         
@@ -665,14 +665,14 @@ def get_report_sections(report_id: str):
 @report_bp.route('/<report_id>/section/<int:section_index>', methods=['GET'])
 def get_single_section(report_id: str, section_index: int):
     """
-    获取单个章节内容
+    getsinglesectioncontent
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
                 "filename": "section_01.md",
-                "content": "## 执行摘要\\n\\n..."
+                "content": "## executesummary\\n\\n..."
             }
         }
     """
@@ -706,7 +706,7 @@ def get_single_section(report_id: str, section_index: int):
         }), 500
 
 
-# ============== 报告状态检查接口 ==============
+# ============== reportstatuscheckinterface ==============
 
 @report_bp.route('/check/<simulation_id>', methods=['GET'])
 def check_report_status(simulation_id: str):
@@ -715,7 +715,7 @@ def check_report_status(simulation_id: str):
     
     用于前端判断是否解锁Interview功能
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -757,7 +757,7 @@ def check_report_status(simulation_id: str):
         }), 500
 
 
-# ============== Agent 日志接口 ==============
+# ============== Agent loginterface ==============
 
 @report_bp.route('/<report_id>/agent-log', methods=['GET'])
 def get_agent_log(report_id: str):
@@ -767,12 +767,12 @@ def get_agent_log(report_id: str):
     实时获取报告生成过程中的每一步动作，包括：
     - 报告开始、规划开始/完成
     - 每个章节的开始、工具调用、LLM响应、完成
-    - 报告完成或失败
+    - reportcompleteorfailed
     
-    Query参数：
+    Queryparameter: 
         from_line: 从第几行开始读取（可选，默认0，用于增量获取）
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -783,7 +783,7 @@ def get_agent_log(report_id: str):
                         "report_id": "report_xxxx",
                         "action": "tool_call",
                         "stage": "generating",
-                        "section_title": "执行摘要",
+                        "section_title": "executesummary",
                         "section_index": 1,
                         "details": {
                             "tool_name": "insight_forge",
@@ -823,7 +823,7 @@ def stream_agent_log(report_id: str):
     """
     获取完整的 Agent 日志（一次性获取全部）
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -852,7 +852,7 @@ def stream_agent_log(report_id: str):
         }), 500
 
 
-# ============== 控制台日志接口 ==============
+# ============== consoleloginterface ==============
 
 @report_bp.route('/<report_id>/console-log', methods=['GET'])
 def get_console_log(report_id: str):
@@ -863,16 +863,16 @@ def get_console_log(report_id: str):
     这与 agent-log 接口返回的结构化 JSON 日志不同，
     是纯文本格式的控制台风格日志。
     
-    Query参数：
+    Queryparameter: 
         from_line: 从第几行开始读取（可选，默认0，用于增量获取）
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
                 "logs": [
                     "[19:46:14] INFO: 搜索完成: 找到 15 条相关事实",
-                    "[19:46:14] INFO: 图谱搜索: graph_id=xxx, query=...",
+                    "[19:46:14] INFO: graphsearch: graph_id=xxx, query=...",
                     ...
                 ],
                 "total_lines": 100,
@@ -905,7 +905,7 @@ def stream_console_log(report_id: str):
     """
     获取完整的控制台日志（一次性获取全部）
     
-    返回：
+    returns: 
         {
             "success": true,
             "data": {
@@ -941,10 +941,10 @@ def search_graph_tool():
     """
     图谱搜索工具接口（供调试使用）
     
-    请求（JSON）：
+    request (JSON) : 
         {
             "graph_id": "mirofish_xxxx",
-            "query": "搜索查询",
+            "query": "searchquery",
             "limit": 10
         }
     """
@@ -989,7 +989,7 @@ def get_graph_statistics_tool():
     """
     图谱统计工具接口（供调试使用）
     
-    请求（JSON）：
+    request (JSON) : 
         {
             "graph_id": "mirofish_xxxx"
         }

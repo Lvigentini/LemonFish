@@ -69,9 +69,8 @@
 
         <!-- Cost estimates -->
         <section v-if="estimate" class="section">
-          <h3>{{ $t('preflight.cost') || 'Approximate cost' }}</h3>
+          <h3>{{ $t('preflight.cost') || 'Approximate cost (if single provider)' }}</h3>
 
-          <!-- Phase 7.8: warning banner when cost is high -->
           <div v-if="costWarningTier" class="cost-warning" :class="costWarningLevel">
             <span class="warning-icon">⚠</span>
             <div class="warning-body">
@@ -88,26 +87,89 @@
           </div>
         </section>
 
-        <!-- Provider pool -->
-        <section v-if="pool && pool.configured" class="section">
-          <h3>{{ $t('preflight.pool') || 'Multi-provider pool' }}</h3>
-          <p class="help-text">Agents will be randomly distributed across these providers:</p>
-          <ul class="provider-list">
-            <li v-for="p in pool.providers" :key="p.name" class="provider-item">
-              <span class="provider-name">{{ p.name }}</span>
-              <span class="provider-model">{{ p.model }}</span>
-              <span v-if="p.daily_token_budget" class="provider-budget">
-                {{ formatTokens(p.daily_token_budget) }}/day
-              </span>
-            </li>
-          </ul>
+        <!-- Token distribution across multi-provider pool -->
+        <section v-if="allocation && pool && pool.configured" class="section">
+          <div class="allocation-header">
+            <h3>{{ $t('preflight.distribution') || 'Token distribution across providers' }}</h3>
+            <button class="btn-link" @click="resetWeights" :disabled="allocLoading">Reset to uniform</button>
+          </div>
+          <p class="help-text">
+            Adjust the share each provider will absorb. Projected usage is compared to each provider's
+            daily budget (minus what's already been used today).
+          </p>
+
+          <div v-if="allocation.any_over" class="alloc-banner over">
+            <strong>⚠ One or more providers will exceed their daily budget</strong>
+            <span>You can still proceed — rate-limited agents will skip their turn — but consider re-balancing.</span>
+          </div>
+          <div v-else-if="allocation.any_warn" class="alloc-banner warn">
+            <strong>One or more providers will be near their daily limit</strong>
+            <span>Projected usage pushes a provider above 80% of its daily budget.</span>
+          </div>
+
+          <div class="alloc-table">
+            <div class="alloc-row alloc-head">
+              <div class="col-name">Provider</div>
+              <div class="col-slider">Share</div>
+              <div class="col-agents">Agents</div>
+              <div class="col-projected">Projected</div>
+              <div class="col-budget">Today / Budget</div>
+              <div class="col-status">Status</div>
+            </div>
+            <div
+              v-for="row in allocation.providers"
+              :key="row.name"
+              class="alloc-row"
+              :class="`status-${row.status}`"
+            >
+              <div class="col-name">
+                <div class="provider-name">{{ row.name }}</div>
+                <div class="provider-model">{{ row.model }}</div>
+              </div>
+              <div class="col-slider">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  :value="sliderValues[row.name] || 0"
+                  @input="onSliderInput(row.name, $event.target.value)"
+                />
+                <span class="slider-pct">{{ row.share_percent }}%</span>
+              </div>
+              <div class="col-agents">{{ row.assigned_agents }}</div>
+              <div class="col-projected">{{ formatTokens(row.projected_tokens) }}</div>
+              <div class="col-budget">
+                <template v-if="row.daily_budget">
+                  {{ formatTokens(row.consumed_today) }} / {{ formatTokens(row.daily_budget) }}
+                </template>
+                <template v-else>
+                  <span class="muted">no budget set</span>
+                </template>
+              </div>
+              <div class="col-status">
+                <span class="status-badge" :class="`badge-${row.status}`">
+                  <template v-if="row.status === 'over'">OVER by {{ formatTokens(row.overage) }}</template>
+                  <template v-else-if="row.status === 'warn'">{{ row.percent_of_budget }}%</template>
+                  <template v-else-if="row.status === 'ok'">OK</template>
+                  <template v-else>∞</template>
+                </span>
+              </div>
+            </div>
+          </div>
         </section>
       </div>
 
       <footer class="preflight-footer">
         <button class="btn-cancel" @click="close">{{ $t('common.cancel') || 'Cancel' }}</button>
-        <button class="btn-proceed" :disabled="loading || !!error" @click="confirm">
-          {{ $t('preflight.proceed') || 'Proceed' }}
+        <button
+          class="btn-proceed"
+          :class="{ 'btn-proceed-warn': allocation && allocation.any_over }"
+          :disabled="loading || !!error"
+          @click="confirm"
+        >
+          <template v-if="allocation && allocation.any_over">Proceed anyway</template>
+          <template v-else>{{ $t('preflight.proceed') || 'Proceed' }}</template>
         </button>
       </footer>
     </div>
@@ -115,11 +177,12 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { estimateTokens, getProviderPool } from '../api/simulation'
+import { ref, watch, computed, reactive } from 'vue'
+import { estimateTokens, getProviderPool, preflightAllocation } from '../api/simulation'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
+  simulationId: { type: String, default: '' },
   agents: { type: Number, default: 0 },
   rounds: { type: Number, default: 10 },
   documentChars: { type: Number, default: 0 },
@@ -132,15 +195,52 @@ const loading = ref(false)
 const error = ref(null)
 const estimate = ref(null)
 const pool = ref(null)
+const allocation = ref(null)
+const allocLoading = ref(false)
+
+// sliderValues holds the raw slider positions (0-100) keyed by provider name.
+// They're the user's input; the backend normalizes them to shares that sum to 1.
+const sliderValues = reactive({})
 
 const close = () => emit('close')
-const confirm = () => emit('confirm', estimate.value)
+
+const confirm = () => {
+  // Persist the weights so Step3Simulation can attach them to /start.
+  // Store normalized {name: 0..1} — backend accepts any positive scale but
+  // keeping it normalized makes the log line readable.
+  if (pool.value && pool.value.configured && props.simulationId) {
+    const total = Object.values(sliderValues).reduce((a, b) => a + Number(b || 0), 0)
+    const payload = {}
+    if (total > 0) {
+      for (const [name, v] of Object.entries(sliderValues)) {
+        payload[name] = Number(v) / total
+      }
+    }
+    try {
+      if (Object.keys(payload).length) {
+        localStorage.setItem(
+          `lemonfish.providerWeights.${props.simulationId}`,
+          JSON.stringify(payload),
+        )
+      }
+    } catch (_) { /* localStorage unavailable — harmless */ }
+  }
+  emit('confirm', { estimate: estimate.value, weights: { ...sliderValues } })
+}
+
+function weightsPayload() {
+  // Send raw slider values to the backend. It normalizes internally.
+  const out = {}
+  for (const [k, v] of Object.entries(sliderValues)) out[k] = Number(v) || 0
+  return out
+}
 
 async function refresh() {
   if (!props.visible) return
   loading.value = true
   error.value = null
   estimate.value = null
+  allocation.value = null
   try {
     const [estRes, poolRes] = await Promise.all([
       estimateTokens({
@@ -153,11 +253,64 @@ async function refresh() {
     ])
     estimate.value = estRes.data
     pool.value = poolRes.data
+
+    // Initialize slider values from localStorage or uniform
+    if (pool.value && pool.value.configured && pool.value.providers?.length) {
+      let restored = null
+      try {
+        const raw = localStorage.getItem(`lemonfish.providerWeights.${props.simulationId}`)
+        if (raw) restored = JSON.parse(raw)
+      } catch (_) { /* noop */ }
+
+      for (const p of pool.value.providers) {
+        if (restored && typeof restored[p.name] === 'number') {
+          // Convert 0..1 normalized back to 0..100 for the slider
+          sliderValues[p.name] = Math.round(restored[p.name] * 100)
+        } else {
+          sliderValues[p.name] = Math.round(100 / pool.value.providers.length)
+        }
+      }
+      await refreshAllocation()
+    }
   } catch (e) {
     error.value = e?.message || String(e)
   } finally {
     loading.value = false
   }
+}
+
+let allocDebounce = null
+async function refreshAllocation() {
+  if (!pool.value?.configured) return
+  allocLoading.value = true
+  try {
+    const res = await preflightAllocation({
+      agents: props.agents,
+      rounds: props.rounds,
+      document_chars: props.documentChars,
+      report_sections: props.reportSections,
+      weights: weightsPayload(),
+    })
+    allocation.value = res.data
+  } catch (e) {
+    // Non-fatal — the rest of the modal still works without quota view
+    console.warn('preflight allocation failed:', e)
+  } finally {
+    allocLoading.value = false
+  }
+}
+
+function onSliderInput(name, value) {
+  sliderValues[name] = Number(value)
+  if (allocDebounce) clearTimeout(allocDebounce)
+  allocDebounce = setTimeout(refreshAllocation, 180)
+}
+
+function resetWeights() {
+  if (!pool.value?.providers?.length) return
+  const share = Math.round(100 / pool.value.providers.length)
+  for (const p of pool.value.providers) sliderValues[p.name] = share
+  refreshAllocation()
 }
 
 watch(() => props.visible, (v) => { if (v) refresh() })
@@ -168,6 +321,7 @@ function formatChars(n) {
 }
 
 function formatTokens(n) {
+  if (!n && n !== 0) return '—'
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
   return String(n)
@@ -208,11 +362,9 @@ function stepPercent(tokens) {
   return Math.max(0.5, (tokens / estimate.value.total.tokens) * 100)
 }
 
-// Phase 7.8: warn when the simulation would be expensive on paid providers
 const costWarningTier = computed(() => {
   if (!estimate.value) return null
   const costs = estimate.value.total.approx_cost_usd
-  // Warn if premium Claude > $5 or total tokens > 10M (high agent/round combo)
   if (costs.premium_claude_sonnet > 5) return 'high'
   if (estimate.value.total.tokens > 10_000_000) return 'very-high'
   if (costs.cheap_deepseek_chat > 2) return 'medium'
@@ -227,12 +379,8 @@ const costWarningLevel = computed(() => {
 })
 
 const costWarningTitle = computed(() => {
-  if (costWarningTier.value === 'very-high') {
-    return 'Very large simulation'
-  }
-  if (costWarningTier.value === 'high') {
-    return 'High-cost scenario on premium models'
-  }
+  if (costWarningTier.value === 'very-high') return 'Very large simulation'
+  if (costWarningTier.value === 'high') return 'High-cost scenario on premium models'
   return 'Moderate cost on paid providers'
 })
 
@@ -240,20 +388,22 @@ const costWarningMessage = computed(() => {
   if (!estimate.value) return ''
   const costs = estimate.value.total.approx_cost_usd
   if (costWarningTier.value === 'very-high') {
-    return `${formatTokens(estimate.value.total.tokens)} tokens is a very large run. Consider reducing agent count or rounds before proceeding. Free tiers will be exhausted quickly.`
+    return `${formatTokens(estimate.value.total.tokens)} tokens is a very large run. Consider reducing agent count or rounds. Free tiers will be exhausted quickly.`
   }
   if (costWarningTier.value === 'high') {
-    return `Claude Sonnet would cost ~$${costs.premium_claude_sonnet.toFixed(2)}. Consider a cheaper provider (Groq, DeepSeek, Gemini Flash) or reduce the scenario size.`
+    return `Claude Sonnet would cost ~$${costs.premium_claude_sonnet.toFixed(2)}. Consider a cheaper provider or reduce the scenario size.`
   }
   return `DeepSeek would cost ~$${costs.cheap_deepseek_chat.toFixed(2)}. Free tier on Groq or Gemini would be $0.`
 })
 </script>
 
 <style scoped>
+/* Light theme — matches Step2EnvSetup and the rest of the app. */
+
 .preflight-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -262,43 +412,43 @@ const costWarningMessage = computed(() => {
 }
 
 .preflight-modal {
-  background: #1a1a1a;
-  color: #e8e8e8;
+  background: #ffffff;
+  color: #1a1a1a;
   border-radius: 12px;
   width: 100%;
-  max-width: 720px;
-  max-height: 90vh;
+  max-width: 820px;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(218, 165, 32, 0.2);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  border: 1px solid #e5e5e5;
 }
 
 .preflight-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 18px 24px;
+  border-bottom: 1px solid #eeeeee;
 }
 
 .preflight-header h2 {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 700;
   margin: 0;
-  color: #DAA520;
+  color: #1a1a1a;
 }
 
 .close-btn {
   background: none;
   border: none;
-  color: #999;
-  font-size: 1.8rem;
+  color: #888;
+  font-size: 1.7rem;
   cursor: pointer;
   line-height: 1;
   padding: 0 8px;
 }
-.close-btn:hover { color: #fff; }
+.close-btn:hover { color: #1a1a1a; }
 
 .preflight-body {
   padding: 20px 24px;
@@ -312,10 +462,10 @@ const costWarningMessage = computed(() => {
 .section:last-child { margin-bottom: 0; }
 
 .section h3 {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #999;
+  letter-spacing: 0.08em;
+  color: #666;
   margin: 0 0 12px 0;
   font-weight: 600;
 }
@@ -323,29 +473,30 @@ const costWarningMessage = computed(() => {
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .metric {
   display: flex;
   justify-content: space-between;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: #f7f7f7;
   border-radius: 6px;
+  border: 1px solid #eeeeee;
 }
-.metric-label { color: #999; font-size: 0.9rem; }
-.metric-value { font-weight: 600; }
+.metric-label { color: #666; font-size: 0.9rem; }
+.metric-value { font-weight: 600; color: #1a1a1a; }
 
 .total-box {
   text-align: center;
-  padding: 20px;
-  background: linear-gradient(135deg, rgba(218, 165, 32, 0.1), rgba(218, 165, 32, 0.03));
-  border: 1px solid rgba(218, 165, 32, 0.3);
+  padding: 18px;
+  background: #fafafa;
+  border: 1px solid #e5e5e5;
   border-radius: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
-.total-value { font-size: 2.5rem; font-weight: 800; color: #DAA520; line-height: 1; }
-.total-label { font-size: 0.85rem; color: #999; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.1em; }
+.total-value { font-size: 2.3rem; font-weight: 800; color: #1a1a1a; line-height: 1; }
+.total-label { font-size: 0.78rem; color: #777; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
 
 .steps { display: flex; flex-direction: column; gap: 8px; }
 .step-row {
@@ -355,33 +506,33 @@ const costWarningMessage = computed(() => {
   gap: 12px;
   font-size: 0.85rem;
 }
-.step-name { color: #ccc; }
+.step-name { color: #1a1a1a; }
 .step-bar-container {
-  background: rgba(255, 255, 255, 0.05);
+  background: #f0f0f0;
   border-radius: 4px;
   height: 8px;
   overflow: hidden;
 }
 .step-bar {
-  background: linear-gradient(90deg, #DAA520, #f0c050);
+  background: linear-gradient(90deg, #FF5722, #ff8a5c);
   height: 100%;
   border-radius: 4px;
   transition: width 0.3s ease;
 }
-.step-tokens { color: #DAA520; font-weight: 600; text-align: right; }
-.step-calls { color: #777; font-size: 0.8rem; text-align: right; }
+.step-tokens { color: #1a1a1a; font-weight: 600; text-align: right; }
+.step-calls { color: #999; font-size: 0.8rem; text-align: right; }
 
 .dominant-note {
   margin-top: 12px;
-  padding: 10px;
-  background: rgba(218, 165, 32, 0.05);
-  border-left: 3px solid #DAA520;
+  padding: 10px 12px;
+  background: #fafafa;
+  border-left: 3px solid #FF5722;
   font-size: 0.85rem;
-  color: #bbb;
+  color: #555;
   border-radius: 0 4px 4px 0;
 }
 
-/* Phase 7.8: cost warning banner */
+/* Cost warning banner */
 .cost-warning {
   display: flex;
   align-items: flex-start;
@@ -391,34 +542,16 @@ const costWarningMessage = computed(() => {
   margin-bottom: 14px;
   border: 1px solid;
 }
-.cost-warning.warn-medium {
-  background: rgba(218, 165, 32, 0.08);
-  border-color: rgba(218, 165, 32, 0.4);
-}
-.cost-warning.warn-high {
-  background: rgba(250, 204, 21, 0.1);
-  border-color: rgba(250, 204, 21, 0.5);
-}
-.cost-warning.warn-danger {
-  background: rgba(248, 113, 113, 0.1);
-  border-color: rgba(248, 113, 113, 0.5);
-}
-.warning-icon {
-  font-size: 1.3rem;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.cost-warning.warn-medium .warning-icon { color: #DAA520; }
-.cost-warning.warn-high .warning-icon { color: #facc15; }
-.cost-warning.warn-danger .warning-icon { color: #f87171; }
-.warning-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.8rem;
-}
-.warning-body strong { color: #fff; }
-.warning-hint { color: #bbb; line-height: 1.4; }
+.cost-warning.warn-medium { background: #fff8e6; border-color: #ffd966; }
+.cost-warning.warn-high { background: #fff3e0; border-color: #ffb74d; }
+.cost-warning.warn-danger { background: #ffebee; border-color: #ef9a9a; }
+.warning-icon { font-size: 1.3rem; line-height: 1; flex-shrink: 0; }
+.cost-warning.warn-medium .warning-icon { color: #f59e0b; }
+.cost-warning.warn-high .warning-icon { color: #fb923c; }
+.cost-warning.warn-danger .warning-icon { color: #ef4444; }
+.warning-body { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; }
+.warning-body strong { color: #1a1a1a; }
+.warning-hint { color: #555; line-height: 1.4; }
 
 .cost-grid {
   display: grid;
@@ -429,44 +562,137 @@ const costWarningMessage = computed(() => {
   display: flex;
   justify-content: space-between;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: #fafafa;
+  border: 1px solid #eeeeee;
   border-radius: 6px;
-  border-left: 3px solid #666;
+  border-left: 3px solid #999;
 }
-.cost-pill.tier-free { border-left-color: #4ade80; }
-.cost-pill.tier-cheap { border-left-color: #60a5fa; }
-.cost-pill.tier-mid { border-left-color: #facc15; }
-.cost-pill.tier-premium { border-left-color: #f87171; }
+.cost-pill.tier-free { border-left-color: #22c55e; }
+.cost-pill.tier-cheap { border-left-color: #3b82f6; }
+.cost-pill.tier-mid { border-left-color: #f59e0b; }
+.cost-pill.tier-premium { border-left-color: #ef4444; }
+.cost-tier { color: #555; font-size: 0.85rem; }
+.cost-value { font-weight: 700; color: #1a1a1a; }
 
-.cost-tier { color: #bbb; font-size: 0.85rem; }
-.cost-value { font-weight: 700; color: #fff; }
-
-.provider-list { list-style: none; padding: 0; margin: 0; }
-.provider-item {
-  display: grid;
-  grid-template-columns: 120px 1fr auto;
-  gap: 12px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  margin-bottom: 6px;
-  font-size: 0.85rem;
+/* Allocation table */
+.allocation-header {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
-.provider-name { color: #DAA520; font-weight: 600; text-transform: uppercase; }
-.provider-model { color: #aaa; font-family: monospace; font-size: 0.8rem; }
-.provider-budget { color: #777; font-size: 0.8rem; }
+.allocation-header h3 { margin: 0; }
 
-.help-text { color: #888; font-size: 0.85rem; margin: 0 0 10px 0; }
+.btn-link {
+  background: none;
+  border: none;
+  color: #FF5722;
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+}
+.btn-link:hover:not(:disabled) { text-decoration: underline; }
+.btn-link:disabled { color: #bbb; cursor: not-allowed; }
 
-.error-msg { color: #f87171; padding: 12px; background: rgba(248, 113, 113, 0.08); border-radius: 6px; }
+.help-text { color: #666; font-size: 0.85rem; margin: 0 0 12px 0; line-height: 1.4; }
+
+.alloc-banner {
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.alloc-banner strong { color: #1a1a1a; }
+.alloc-banner span { color: #555; }
+.alloc-banner.over { background: #ffebee; border: 1px solid #ef9a9a; }
+.alloc-banner.warn { background: #fff8e6; border: 1px solid #ffd966; }
+
+.alloc-table {
+  border: 1px solid #eeeeee;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.alloc-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1.6fr 0.6fr 0.9fr 1.3fr 1.2fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.85rem;
+}
+.alloc-row:last-child { border-bottom: none; }
+.alloc-head {
+  background: #fafafa;
+  color: #666;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.alloc-row.status-over { background: #fff5f5; }
+.alloc-row.status-warn { background: #fffdf3; }
+
+.col-name .provider-name {
+  font-weight: 600;
+  color: #1a1a1a;
+  text-transform: lowercase;
+}
+.col-name .provider-model {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: #888;
+}
+.col-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.col-slider input[type=range] {
+  flex: 1;
+  accent-color: #FF5722;
+}
+.slider-pct {
+  font-variant-numeric: tabular-nums;
+  color: #555;
+  font-size: 0.8rem;
+  min-width: 38px;
+  text-align: right;
+}
+.col-agents, .col-projected, .col-budget {
+  font-variant-numeric: tabular-nums;
+  color: #333;
+}
+.col-budget .muted { color: #aaa; font-style: italic; }
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-ok { background: #e6f7ea; color: #1b8a3a; }
+.badge-warn { background: #fff3cf; color: #8a6100; }
+.badge-over { background: #fde2e2; color: #b42318; }
+.badge-unbudgeted { background: #eeeeee; color: #666; }
+
+.error-msg { color: #b42318; padding: 12px; background: #fde2e2; border-radius: 6px; }
 
 .loading-section { text-align: center; padding: 40px 20px; }
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid rgba(218, 165, 32, 0.2);
-  border-top-color: #DAA520;
+  border: 3px solid #ffdccf;
+  border-top-color: #FF5722;
   border-radius: 50%;
   margin: 0 auto 12px;
   animation: spin 0.8s linear infinite;
@@ -478,11 +704,12 @@ const costWarningMessage = computed(() => {
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid #eeeeee;
+  background: #fafafa;
 }
 
 .btn-cancel, .btn-proceed {
-  padding: 10px 20px;
+  padding: 10px 22px;
   border-radius: 6px;
   font-weight: 600;
   cursor: pointer;
@@ -491,14 +718,19 @@ const costWarningMessage = computed(() => {
   transition: all 0.15s;
 }
 .btn-cancel {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ccc;
+  background: #ffffff;
+  color: #333;
+  border: 1px solid #dddddd;
 }
-.btn-cancel:hover { background: rgba(255, 255, 255, 0.12); }
+.btn-cancel:hover { background: #f5f5f5; }
 .btn-proceed {
-  background: #DAA520;
-  color: #000;
+  background: #1a1a1a;
+  color: #ffffff;
 }
-.btn-proceed:hover:not(:disabled) { background: #f0c050; }
+.btn-proceed:hover:not(:disabled) { background: #000000; }
 .btn-proceed:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-proceed.btn-proceed-warn {
+  background: #ef4444;
+}
+.btn-proceed.btn-proceed-warn:hover:not(:disabled) { background: #dc2626; }
 </style>

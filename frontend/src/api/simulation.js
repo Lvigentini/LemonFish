@@ -196,6 +196,14 @@ export const estimateTokens = (data) => {
 }
 
 /**
+ * Pre-flight per-provider token projection given optional weights.
+ * @param {Object} data - { agents, rounds, document_chars, report_sections?, weights? }
+ */
+export const preflightAllocation = (data) => {
+  return service.post('/api/simulation/preflight/allocation', data)
+}
+
+/**
  * Get actual token usage for a simulation.
  * @param {string} simulationId
  */

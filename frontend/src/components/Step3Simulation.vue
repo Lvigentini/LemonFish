@@ -3,7 +3,7 @@
     <!-- Top Control Bar -->
     <div class="control-bar">
       <div class="status-group">
-        <!-- Twitter 平台进度 -->
+        <!-- Twitter platformprogress -->
         <div class="platform-status twitter" :class="{ active: runStatus.twitter_running, completed: runStatus.twitter_completed }">
           <div class="platform-header">
             <svg class="platform-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
@@ -30,7 +30,7 @@
               <span class="stat-value mono">{{ runStatus.twitter_actions_count || 0 }}</span>
             </span>
           </div>
-          <!-- 可用动作提示 -->
+          <!-- availableactionhint -->
           <div class="actions-tooltip">
             <div class="tooltip-title">Available Actions</div>
             <div class="tooltip-actions">
@@ -44,7 +44,7 @@
           </div>
         </div>
         
-        <!-- Reddit 平台进度 -->
+        <!-- Reddit platformprogress -->
         <div class="platform-status reddit" :class="{ active: runStatus.reddit_running, completed: runStatus.reddit_completed }">
           <div class="platform-header">
             <svg class="platform-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
@@ -71,7 +71,7 @@
               <span class="stat-value mono">{{ runStatus.reddit_actions_count || 0 }}</span>
             </span>
           </div>
-          <!-- 可用动作提示 -->
+          <!-- availableactionhint -->
           <div class="actions-tooltip">
             <div class="tooltip-title">Available Actions</div>
             <div class="tooltip-actions">
@@ -157,12 +157,12 @@
               </div>
               
               <div class="card-body">
-                <!-- CREATE_POST: 发布帖子 -->
+                <!-- CREATE_POST: publishpost -->
                 <div v-if="action.action_type === 'CREATE_POST' && action.action_args?.content" class="content-text main-text">
                   {{ action.action_args.content }}
                 </div>
 
-                <!-- QUOTE_POST: 引用帖子 -->
+                <!-- QUOTE_POST: referencepost -->
                 <template v-if="action.action_type === 'QUOTE_POST'">
                   <div v-if="action.action_args?.quote_content" class="content-text">
                     {{ action.action_args.quote_content }}
@@ -304,7 +304,7 @@ const props = defineProps({
   maxRounds: Number, // 从Step2传入的最大轮数
   minutesPerRound: {
     type: Number,
-    default: 30 // 默认每轮30分钟
+    default: 30 // defaultper round30minute
   },
   projectData: Object,
   graphData: Object,
@@ -317,7 +317,7 @@ const router = useRouter()
 
 // State
 const isGeneratingReport = ref(false)
-const phase = ref(0) // 0: 未开始, 1: 运行中, 2: 已完成
+const phase = ref(0) // 0: not started, 1: running, 2: completed
 const isStarting = ref(false)
 const isStopping = ref(false)
 const startError = ref(null)
@@ -365,7 +365,7 @@ const addLog = (msg) => {
   emit('add-log', msg)
 }
 
-// 重置所有状态（用于重新启动模拟）
+// resetallstatus (used forrestartsimulation) 
 const resetAllState = () => {
   phase.value = 0
   runStatus.value = {}
@@ -379,7 +379,7 @@ const resetAllState = () => {
   stopPolling()  // 停止之前可能存在的轮询
 }
 
-// 启动模拟
+// startsimulation
 const doStartSimulation = async () => {
   if (!props.simulationId) {
     addLog(t('log.errorMissingSimId'))
@@ -398,14 +398,28 @@ const doStartSimulation = async () => {
     const params = {
       simulation_id: props.simulationId,
       platform: 'parallel',
-      force: true,  // 强制重新开始
+      force: true,  // strongrebuildnewbegin
       enable_graph_memory_update: true  // 开启动态图谱更新
     }
-    
+
     if (props.maxRounds) {
       params.max_rounds = props.maxRounds
       addLog(t('log.setMaxRounds', { rounds: props.maxRounds }))
     }
+
+    // Pick up multi-provider weights set in the pre-flight modal, if any.
+    // Stored as JSON in localStorage keyed on the simulation_id so it
+    // survives the Step2→Step3 remount without prop plumbing.
+    try {
+      const raw = localStorage.getItem(`lemonfish.providerWeights.${props.simulationId}`)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          params.provider_weights = parsed
+          addLog(`Multi-provider weights applied: ${Object.entries(parsed).map(([k, v]) => `${k}=${Math.round(v * 100)}%`).join(', ')}`)
+        }
+      }
+    } catch (_) { /* ignore — fall back to uniform */ }
     
     addLog(t('log.graphMemoryUpdateEnabled'))
     
@@ -437,7 +451,7 @@ const doStartSimulation = async () => {
   }
 }
 
-// 停止模拟
+// stop simulation
 const handleStopSimulation = async () => {
   if (!props.simulationId) return
   
@@ -462,7 +476,7 @@ const handleStopSimulation = async () => {
   }
 }
 
-// 轮询状态
+// pollstatus
 let statusTimer = null
 let detailTimer = null
 
@@ -533,7 +547,7 @@ const fetchRunStatus = async () => {
   }
 }
 
-// 检查所有启用的平台是否已完成
+// checkall enabled platformswhethercompleted
 const checkPlatformsCompleted = (data) => {
   // 如果没有任何平台数据，返回 false
   if (!data) return false
@@ -550,7 +564,7 @@ const checkPlatformsCompleted = (data) => {
   // 如果没有任何平台被启用，返回 false
   if (!twitterEnabled && !redditEnabled) return false
   
-  // 检查所有启用的平台是否都已完成
+  // check whether all enabled platforms are complete
   if (twitterEnabled && !twitterCompleted) return false
   if (redditEnabled && !redditCompleted) return false
   
@@ -570,7 +584,7 @@ const fetchRunStatusDetail = async () => {
       // 增量添加新动作（去重）
       let newActionsAdded = 0
       serverActions.forEach(action => {
-        // 生成唯一ID
+        // generateuniqueID
         const actionId = action.id || `${action.timestamp}-${action.platform}-${action.agent_id}-${action.action_type}`
         
         if (!actionIds.value.has(actionId)) {

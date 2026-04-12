@@ -21,15 +21,15 @@ T = TypeVar('T')
 
 @dataclass
 class EntityNode:
-    """实体节点数据结构"""
+    """entity nodedatastructure"""
     uuid: str
     name: str
     labels: List[str]
     summary: str
     attributes: Dict[str, Any]
-    # 相关的边信息
+    # relatededgeinfo
     related_edges: List[Dict[str, Any]] = field(default_factory=list)
-    # 相关的其他节点信息
+    # relatedothernodeinfo
     related_nodes: List[Dict[str, Any]] = field(default_factory=list)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -72,7 +72,7 @@ class ZepEntityReader:
     """
     Zep实体读取与过滤服务
     
-    主要功能：
+    primaryfeature: 
     1. 从Zep图谱读取所有节点
     2. 筛选出符合预定义实体类型的节点（Labels不只是Entity的节点）
     3. 获取每个实体的相关边和关联节点信息
@@ -129,10 +129,10 @@ class ZepEntityReader:
         获取图谱的所有节点（分页获取）
 
         Args:
-            graph_id: 图谱ID
+            graph_id: graph ID
 
         Returns:
-            节点列表
+            nodelist
         """
         logger.info(f"获取图谱 {graph_id} 的所有节点...")
 
@@ -156,10 +156,10 @@ class ZepEntityReader:
         获取图谱的所有边（分页获取）
 
         Args:
-            graph_id: 图谱ID
+            graph_id: graph ID
 
         Returns:
-            边列表
+            edgelist
         """
         logger.info(f"获取图谱 {graph_id} 的所有边...")
 
@@ -184,10 +184,10 @@ class ZepEntityReader:
         获取指定节点的所有相关边（带重试机制）
         
         Args:
-            node_uuid: 节点UUID
+            node_uuid: nodeUUID
             
         Returns:
-            边列表
+            edgelist
         """
         try:
             # 使用重试机制调用Zep API
@@ -235,7 +235,7 @@ class ZepEntityReader:
         """
         logger.info(f"开始筛选图谱 {graph_id} 的实体...")
         
-        # 获取所有节点
+        # getallnode
         all_nodes = self.get_all_nodes(graph_id)
         total_count = len(all_nodes)
         
@@ -270,7 +270,7 @@ class ZepEntityReader:
             
             entity_types_found.add(entity_type)
             
-            # 创建实体节点对象
+            # createentity nodeobject
             entity = EntityNode(
                 uuid=node["uuid"],
                 name=node["name"],
@@ -279,7 +279,7 @@ class ZepEntityReader:
                 attributes=node["attributes"],
             )
             
-            # 获取相关边和节点
+            # getrelatededgeandnode
             if enrich_with_edges:
                 related_edges = []
                 related_node_uuids = set()
@@ -362,7 +362,7 @@ class ZepEntityReader:
             all_nodes = self.get_all_nodes(graph_id)
             node_map = {n["uuid"]: n for n in all_nodes}
             
-            # 处理相关边和节点
+            # processrelatededgeandnode
             related_edges = []
             related_node_uuids = set()
             

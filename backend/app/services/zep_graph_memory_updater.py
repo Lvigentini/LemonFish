@@ -1,5 +1,5 @@
 """
-Zep图谱记忆更新服务
+Zepgraphmemoryupdateservice
 将模拟中的Agent活动动态更新到Zep图谱中
 """
 
@@ -23,7 +23,7 @@ logger = get_logger('mirofish.zep_graph_memory_updater')
 
 @dataclass
 class AgentActivity:
-    """Agent活动记录"""
+    """Agentactivityrecord"""
     platform: str           # twitter / reddit
     agent_id: int
     agent_name: str
@@ -151,7 +151,7 @@ class AgentActivity:
         return "发表了评论"
     
     def _describe_like_comment(self) -> str:
-        """点赞评论 - 包含评论内容和作者信息"""
+        """likecomment - containcommentcontentandauthorinfo"""
         comment_content = self.action_args.get("comment_content", "")
         comment_author = self.action_args.get("comment_author_name", "")
         
@@ -216,7 +216,7 @@ class ZepGraphMemoryUpdater:
     # 批量发送大小（每个平台累积多少条后发送）
     BATCH_SIZE = 5
     
-    # 平台名称映射（用于控制台显示）
+    # platformnamemapping (used forconsoleshow) 
     PLATFORM_DISPLAY_NAMES = {
         'twitter': '世界1',
         'reddit': '世界2',
@@ -225,16 +225,16 @@ class ZepGraphMemoryUpdater:
     # 发送间隔（秒），避免请求过快
     SEND_INTERVAL = 0.5
     
-    # 重试配置
+    # retryconfig
     MAX_RETRIES = 3
-    RETRY_DELAY = 2  # 秒
+    RETRY_DELAY = 2  # seconds
     
     def __init__(self, graph_id: str, api_key: Optional[str] = None):
         """
         初始化更新器
         
         Args:
-            graph_id: Zep图谱ID
+            graph_id: Zepgraph ID
             api_key: Zep API Key（可选，默认从配置读取）
         """
         self.graph_id = graph_id
@@ -245,7 +245,7 @@ class ZepGraphMemoryUpdater:
         
         self.client = Zep(api_key=self.api_key)
         
-        # 活动队列
+        # activityqueue
         self._activity_queue: Queue = Queue()
         
         # 按平台分组的活动缓冲区（每个平台各自累积到BATCH_SIZE后批量发送）
@@ -259,7 +259,7 @@ class ZepGraphMemoryUpdater:
         self._running = False
         self._worker_thread: Optional[threading.Thread] = None
         
-        # 统计
+        # statistics
         self._total_activities = 0  # 实际添加到队列的活动数
         self._total_sent = 0        # 成功发送到Zep的批次数
         self._total_items_sent = 0  # 成功发送到Zep的活动条数
@@ -273,7 +273,7 @@ class ZepGraphMemoryUpdater:
         return self.PLATFORM_DISPLAY_NAMES.get(platform.lower(), platform)
     
     def start(self):
-        """启动后台工作线程"""
+        """startbackgroundworkthread"""
         if self._running:
             return
 
@@ -291,7 +291,7 @@ class ZepGraphMemoryUpdater:
         logger.info(f"ZepGraphMemoryUpdater 已启动: graph_id={self.graph_id}")
     
     def stop(self):
-        """停止后台工作线程"""
+        """stopbackgroundworkthread"""
         self._running = False
         
         # 发送剩余的活动
@@ -312,21 +312,21 @@ class ZepGraphMemoryUpdater:
         添加一个agent活动到队列
         
         所有有意义的行为都会被添加到队列，包括：
-        - CREATE_POST（发帖）
-        - CREATE_COMMENT（评论）
-        - QUOTE_POST（引用帖子）
-        - SEARCH_POSTS（搜索帖子）
-        - SEARCH_USER（搜索用户）
+        - CREATE_POST (post) 
+        - CREATE_COMMENT (comment) 
+        - QUOTE_POST (referencepost) 
+        - SEARCH_POSTS (searchpost) 
+        - SEARCH_USER (searchuser) 
         - LIKE_POST/DISLIKE_POST（点赞/踩帖子）
-        - REPOST（转发）
-        - FOLLOW（关注）
+        - REPOST (repost) 
+        - FOLLOW (follow) 
         - MUTE（屏蔽）
         - LIKE_COMMENT/DISLIKE_COMMENT（点赞/踩评论）
         
         action_args中会包含完整的上下文信息（如帖子原文、用户名等）。
         
         Args:
-            activity: Agent活动记录
+            activity: Agentactivityrecord
         """
         # 跳过DO_NOTHING类型的活动
         if activity.action_type == "DO_NOTHING":
@@ -343,7 +343,7 @@ class ZepGraphMemoryUpdater:
         
         Args:
             data: 从actions.jsonl解析的字典数据
-            platform: 平台名称 (twitter/reddit)
+            platform: platformname (twitter/reddit)
         """
         # 跳过事件类型的条目
         if "event_type" in data:
@@ -398,8 +398,8 @@ class ZepGraphMemoryUpdater:
         批量发送活动到Zep图谱（合并为一条文本）
         
         Args:
-            activities: Agent活动列表
-            platform: 平台名称
+            activities: Agentactivitylist
+            platform: platformname
         """
         if not activities:
             return
@@ -458,7 +458,7 @@ class ZepGraphMemoryUpdater:
                 self._platform_buffers[platform] = []
     
     def get_stats(self) -> Dict[str, Any]:
-        """获取统计信息"""
+        """getstatisticsinfo"""
         with self._buffer_lock:
             buffer_sizes = {p: len(b) for p, b in self._platform_buffers.items()}
         
@@ -492,8 +492,8 @@ class ZepGraphMemoryManager:
         为模拟创建图谱记忆更新器
         
         Args:
-            simulation_id: 模拟ID
-            graph_id: Zep图谱ID
+            simulation_id: simulation ID
+            graph_id: Zepgraph ID
             
         Returns:
             ZepGraphMemoryUpdater实例
@@ -530,7 +530,7 @@ class ZepGraphMemoryManager:
     @classmethod
     def stop_all(cls):
         """停止所有更新器"""
-        # 防止重复调用
+        # preventduplicatecall
         if cls._stop_all_done:
             return
         cls._stop_all_done = True

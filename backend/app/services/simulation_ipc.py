@@ -5,7 +5,7 @@
 通过文件系统实现简单的命令/响应模式：
 1. Flask写入命令到 commands/ 目录
 2. 模拟脚本轮询命令目录，执行命令并写入响应到 responses/ 目录
-3. Flask轮询响应目录获取结果
+3. Flaskpollresponsedirectorygetresult
 """
 
 import os
@@ -23,14 +23,14 @@ logger = get_logger('mirofish.simulation_ipc')
 
 
 class CommandType(str, Enum):
-    """命令类型"""
-    INTERVIEW = "interview"           # 单个Agent采访
-    BATCH_INTERVIEW = "batch_interview"  # 批量采访
-    CLOSE_ENV = "close_env"           # 关闭环境
+    """commandtype"""
+    INTERVIEW = "interview"           # singleAgentinterview
+    BATCH_INTERVIEW = "batch_interview"  # batchinterview
+    CLOSE_ENV = "close_env"           # closeenvironment
 
 
 class CommandStatus(str, Enum):
-    """命令状态"""
+    """commandstatus"""
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -39,7 +39,7 @@ class CommandStatus(str, Enum):
 
 @dataclass
 class IPCCommand:
-    """IPC命令"""
+    """IPCcommand"""
     command_id: str
     command_type: CommandType
     args: Dict[str, Any]
@@ -65,7 +65,7 @@ class IPCCommand:
 
 @dataclass
 class IPCResponse:
-    """IPC响应"""
+    """IPCresponse"""
     command_id: str
     status: CommandStatus
     result: Optional[Dict[str, Any]] = None
@@ -101,16 +101,16 @@ class SimulationIPCClient:
     
     def __init__(self, simulation_dir: str):
         """
-        初始化IPC客户端
+        initialiseIPCclient
         
         Args:
-            simulation_dir: 模拟数据目录
+            simulation_dir: simulation datadirectory
         """
         self.simulation_dir = simulation_dir
         self.commands_dir = os.path.join(simulation_dir, "ipc_commands")
         self.responses_dir = os.path.join(simulation_dir, "ipc_responses")
         
-        # 确保目录存在
+        # ensuredirectoryexists
         os.makedirs(self.commands_dir, exist_ok=True)
         os.makedirs(self.responses_dir, exist_ok=True)
     
@@ -150,7 +150,7 @@ class SimulationIPCClient:
         
         logger.info(f"发送IPC命令: {command_type.value}, command_id={command_id}")
         
-        # 等待响应
+        # waitresponse
         response_file = os.path.join(self.responses_dir, f"{command_id}.json")
         start_time = time.time()
         
@@ -161,7 +161,7 @@ class SimulationIPCClient:
                         response_data = json.load(f)
                     response = IPCResponse.from_dict(response_data)
                     
-                    # 清理命令和响应文件
+                    # cleanupcommandandresponsefile
                     try:
                         os.remove(command_file)
                         os.remove(response_file)
@@ -175,10 +175,10 @@ class SimulationIPCClient:
             
             time.sleep(poll_interval)
         
-        # 超时
+        # timeout
         logger.error(f"等待IPC响应超时: command_id={command_id}")
         
-        # 清理命令文件
+        # cleanupcommandfile
         try:
             os.remove(command_file)
         except OSError:
@@ -253,10 +253,10 @@ class SimulationIPCClient:
     
     def send_close_env(self, timeout: float = 30.0) -> IPCResponse:
         """
-        发送关闭环境命令
+        sendcloseenvironmentcommand
         
         Args:
-            timeout: 超时时间
+            timeout: timeouttime
             
         Returns:
             IPCResponse
@@ -294,20 +294,20 @@ class SimulationIPCServer:
     
     def __init__(self, simulation_dir: str):
         """
-        初始化IPC服务器
+        initialiseIPCserver
         
         Args:
-            simulation_dir: 模拟数据目录
+            simulation_dir: simulation datadirectory
         """
         self.simulation_dir = simulation_dir
         self.commands_dir = os.path.join(simulation_dir, "ipc_commands")
         self.responses_dir = os.path.join(simulation_dir, "ipc_responses")
         
-        # 确保目录存在
+        # ensuredirectoryexists
         os.makedirs(self.commands_dir, exist_ok=True)
         os.makedirs(self.responses_dir, exist_ok=True)
         
-        # 环境状态
+        # environmentstatus
         self._running = False
     
     def start(self):
@@ -321,7 +321,7 @@ class SimulationIPCServer:
         self._update_env_status("stopped")
     
     def _update_env_status(self, status: str):
-        """更新环境状态文件"""
+        """updateenvironmentstatusfile"""
         status_file = os.path.join(self.simulation_dir, "env_status.json")
         with open(status_file, 'w', encoding='utf-8') as f:
             json.dump({
@@ -334,7 +334,7 @@ class SimulationIPCServer:
         轮询命令目录，返回第一个待处理的命令
         
         Returns:
-            IPCCommand 或 None
+            IPCCommand or None
         """
         if not os.path.exists(self.commands_dir):
             return None
@@ -361,16 +361,16 @@ class SimulationIPCServer:
     
     def send_response(self, response: IPCResponse):
         """
-        发送响应
+        sendresponse
         
         Args:
-            response: IPC响应
+            response: IPCresponse
         """
         response_file = os.path.join(self.responses_dir, f"{response.command_id}.json")
         with open(response_file, 'w', encoding='utf-8') as f:
             json.dump(response.to_dict(), f, ensure_ascii=False, indent=2)
         
-        # 删除命令文件
+        # deletecommandfile
         command_file = os.path.join(self.commands_dir, f"{response.command_id}.json")
         try:
             os.remove(command_file)
@@ -378,7 +378,7 @@ class SimulationIPCServer:
             pass
     
     def send_success(self, command_id: str, result: Dict[str, Any]):
-        """发送成功响应"""
+        """sendsuccessresponse"""
         self.send_response(IPCResponse(
             command_id=command_id,
             status=CommandStatus.COMPLETED,
@@ -386,7 +386,7 @@ class SimulationIPCServer:
         ))
     
     def send_error(self, command_id: str, error: str):
-        """发送错误响应"""
+        """senderrorresponse"""
         self.send_response(IPCResponse(
             command_id=command_id,
             status=CommandStatus.FAILED,

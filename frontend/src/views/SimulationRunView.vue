@@ -49,7 +49,7 @@
         />
       </div>
 
-      <!-- Right Panel: Step3 开始模拟 -->
+      <!-- Right Panel: Step3 start simulation -->
       <div class="panel-wrapper right" :style="rightPanelStyle">
         <Step3Simulation
           :simulationId="currentSimulationId"
@@ -94,7 +94,7 @@ const viewMode = ref('split')
 const currentSimulationId = ref(route.params.simulationId)
 // 直接在初始化时从 query 参数获取 maxRounds，确保子组件能立即获取到值
 const maxRounds = ref(route.query.maxRounds ? parseInt(route.query.maxRounds) : null)
-const minutesPerRound = ref(30) // 默认每轮30分钟
+const minutesPerRound = ref(30) // defaultper round30minute
 const projectData = ref(null)
 const graphData = ref(null)
 const graphLoading = ref(false)
@@ -153,7 +153,7 @@ const handleGoBack = async () => {
   // 在返回 Step 2 之前，先关闭正在运行的模拟
   addLog(t('log.preparingGoBack'))
   
-  // 停止轮询
+  // stoppoll
   stopGraphRefresh()
   
   try {
@@ -208,7 +208,7 @@ const loadSimulationData = async () => {
   try {
     addLog(t('log.loadingSimData', { id: currentSimulationId.value }))
     
-    // 获取 simulation 信息
+    // get simulation info
     const simRes = await getSimulation(currentSimulationId.value)
     if (simRes.success && simRes.data) {
       const simData = simRes.data
@@ -224,14 +224,14 @@ const loadSimulationData = async () => {
         addLog(t('log.timeConfigFetchFailed', { minutes: minutesPerRound.value }))
       }
       
-      // 获取 project 信息
+      // get project info
       if (simData.project_id) {
         const projRes = await getProject(simData.project_id)
         if (projRes.success && projRes.data) {
           projectData.value = projRes.data
           addLog(t('log.projectLoadSuccess', { id: projRes.data.project_id }))
           
-          // 获取 graph 数据
+          // get graph data
           if (projRes.data.graph_id) {
             await loadGraph(projRes.data.graph_id)
           }

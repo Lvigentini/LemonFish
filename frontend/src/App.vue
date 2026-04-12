@@ -7,7 +7,7 @@
 </script>
 
 <style>
-/* 全局样式重置 */
+/* global style reset */
 * {
   margin: 0;
   padding: 0;
@@ -22,7 +22,7 @@
   background-color: #ffffff;
 }
 
-/* 滚动条样式 */
+/* scrollbar styles */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

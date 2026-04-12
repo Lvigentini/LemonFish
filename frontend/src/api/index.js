@@ -38,7 +38,7 @@ service.interceptors.response.use(
   error => {
     console.error('Response error:', error)
     
-    // 处理超时
+    // processtimeout
     if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
       console.error('Request timeout')
     }

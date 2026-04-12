@@ -3,25 +3,25 @@ OASIS 双平台并行模拟预设脚本
 同时运行Twitter和Reddit模拟，读取相同的配置文件
 
 功能特性:
-- 双平台（Twitter + Reddit）并行模拟
+- dual platform (Twitter + Reddit) parallelsimulation
 - 完成模拟后不立即关闭环境，进入等待命令模式
 - 支持通过IPC接收Interview命令
-- 支持单个Agent采访和批量采访
+- supportsingleAgentinterviewandbatchinterview
 - 支持远程关闭环境命令
 
 使用方式:
     python run_parallel_simulation.py --config simulation_config.json
-    python run_parallel_simulation.py --config simulation_config.json --no-wait  # 完成后立即关闭
+    python run_parallel_simulation.py --config simulation_config.json --no-wait  # completebackimmediatelyclose
     python run_parallel_simulation.py --config simulation_config.json --twitter-only
     python run_parallel_simulation.py --config simulation_config.json --reddit-only
 
-日志结构:
+logstructure:
     sim_xxx/
     ├── twitter/
-    │   └── actions.jsonl    # Twitter 平台动作日志
+    │   └── actions.jsonl    # Twitter platformactionlog
     ├── reddit/
-    │   └── actions.jsonl    # Reddit 平台动作日志
-    ├── simulation.log       # 主模拟进程日志
+    │   └── actions.jsonl    # Reddit platformactionlog
+    ├── simulation.log       # mainsimulation processlog
     └── run_state.json       # 运行状态（API 查询用）
 """
 
@@ -77,7 +77,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
 
-# 全局变量：用于信号处理
+# globalvariables: used forsignalprocess
 _shutdown_event = None
 _cleanup_done = False
 
@@ -96,7 +96,7 @@ if os.path.exists(_env_file):
     load_dotenv(_env_file)
     print(f"已加载环境配置: {_env_file}")
 else:
-    # 尝试加载 backend/.env
+    # attemptload backend/.env
     _backend_env = os.path.join(_backend_dir, '.env')
     if os.path.exists(_backend_env):
         load_dotenv(_backend_env)
@@ -160,7 +160,7 @@ def init_logging_for_simulation(simulation_dir: str):
     初始化模拟的日志配置
     
     Args:
-        simulation_dir: 模拟目录路径
+        simulation_dir: simulationdirectorypath
     """
     # 禁用 OASIS 的详细日志
     disable_oasis_logging()
@@ -256,12 +256,12 @@ class ParallelIPCHandler:
         self.responses_dir = os.path.join(simulation_dir, IPC_RESPONSES_DIR)
         self.status_file = os.path.join(simulation_dir, ENV_STATUS_FILE)
         
-        # 确保目录存在
+        # ensuredirectoryexists
         os.makedirs(self.commands_dir, exist_ok=True)
         os.makedirs(self.responses_dir, exist_ok=True)
     
     def update_status(self, status: str):
-        """更新环境状态"""
+        """updateenvironmentstatus"""
         with open(self.status_file, 'w', encoding='utf-8') as f:
             json.dump({
                 "status": status,
@@ -294,7 +294,7 @@ class ParallelIPCHandler:
         return None
     
     def send_response(self, command_id: str, status: str, result: Dict = None, error: str = None):
-        """发送响应"""
+        """sendresponse"""
         response = {
             "command_id": command_id,
             "status": status,
@@ -307,7 +307,7 @@ class ParallelIPCHandler:
         with open(response_file, 'w', encoding='utf-8') as f:
             json.dump(response, f, ensure_ascii=False, indent=2)
         
-        # 删除命令文件
+        # deletecommandfile
         command_file = os.path.join(self.commands_dir, f"{command_id}.json")
         try:
             os.remove(command_file)
@@ -319,10 +319,10 @@ class ParallelIPCHandler:
         获取指定平台的环境和agent_graph
         
         Args:
-            platform: 平台名称 ("twitter" 或 "reddit")
+            platform: platformname ("twitter" or "reddit")
             
         Returns:
-            (env, agent_graph, platform_name) 或 (None, None, None)
+            (env, agent_graph, platform_name) or (None, None, None)
         """
         if platform == "twitter" and self.twitter_env:
             return self.twitter_env, self.twitter_agent_graph, "twitter"
@@ -361,19 +361,19 @@ class ParallelIPCHandler:
     
     async def handle_interview(self, command_id: str, agent_id: int, prompt: str, platform: str = None) -> bool:
         """
-        处理单个Agent采访命令
+        processsingleAgentinterviewcommand
         
         Args:
-            command_id: 命令ID
+            command_id: commandID
             agent_id: Agent ID
-            prompt: 采访问题
-            platform: 指定平台（可选）
-                - "twitter": 只采访Twitter平台
-                - "reddit": 只采访Reddit平台
+            prompt: interviewissue
+            platform: specifyplatform (optional) 
+                - "twitter": interview onlyTwitterplatform
+                - "reddit": interview onlyRedditplatform
                 - None/不指定: 同时采访两个平台，返回整合结果
             
         Returns:
-            True 表示成功，False 表示失败
+            True meanssuccess, False meansfailed
         """
         # 如果指定了平台，只采访该平台
         if platform in ("twitter", "reddit"):
@@ -400,7 +400,7 @@ class ParallelIPCHandler:
         }
         success_count = 0
         
-        # 并行采访两个平台
+        # parallelinterview both platforms
         tasks = []
         platforms_to_interview = []
         
@@ -412,7 +412,7 @@ class ParallelIPCHandler:
             tasks.append(self._interview_single_platform(agent_id, prompt, "reddit"))
             platforms_to_interview.append("reddit")
         
-        # 并行执行
+        # parallelexecute
         platform_results = await asyncio.gather(*tasks)
         
         for platform_name, platform_result in zip(platforms_to_interview, platform_results):
@@ -432,15 +432,15 @@ class ParallelIPCHandler:
     
     async def handle_batch_interview(self, command_id: str, interviews: List[Dict], platform: str = None) -> bool:
         """
-        处理批量采访命令
+        processbatchinterviewcommand
         
         Args:
-            command_id: 命令ID
+            command_id: commandID
             interviews: [{"agent_id": int, "prompt": str, "platform": str(optional)}, ...]
             platform: 默认平台（可被每个interview项覆盖）
-                - "twitter": 只采访Twitter平台
-                - "reddit": 只采访Reddit平台
-                - None/不指定: 每个Agent同时采访两个平台
+                - "twitter": interview onlyTwitterplatform
+                - "reddit": interview onlyRedditplatform
+                - None/unspecified: eachAgentsimultaneouslyinterview both platforms
         """
         # 按平台分组
         twitter_interviews = []
@@ -619,7 +619,7 @@ class ParallelIPCHandler:
 
 
 def load_config(config_path: str) -> Dict[str, Any]:
-    """加载配置文件"""
+    """loadconfig file"""
     with open(config_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
@@ -709,14 +709,14 @@ def fetch_new_actions_from_db(
         """, (last_rowid,))
         
         for rowid, user_id, action, info_json in cursor.fetchall():
-            # 更新最大 rowid
+            # updatemax rowid
             new_last_rowid = rowid
             
             # 过滤非核心动作
             if action in FILTERED_ACTIONS:
                 continue
             
-            # 解析动作参数
+            # parseactionparameter
             try:
                 action_args = json.loads(info_json) if info_json else {}
             except json.JSONDecodeError:
@@ -1000,7 +1000,7 @@ def _get_comment_info(
 
 def create_model(config: Dict[str, Any], use_boost: bool = False):
     """
-    创建LLM模型
+    createLLMmodel
     
     支持双 LLM 配置，用于并行模拟时提速：
     - 通用配置：LLM_API_KEY, LLM_BASE_URL, LLM_MODEL_NAME
@@ -1009,7 +1009,7 @@ def create_model(config: Dict[str, Any], use_boost: bool = False):
     如果配置了加速 LLM，并行模拟时可以让不同平台使用不同的 API 服务商，提高并发能力。
     
     Args:
-        config: 模拟配置字典
+        config: simulation configdict
         use_boost: 是否使用加速 LLM 配置（如果可用）
     """
     # Resolution order for simulation LLM:
@@ -1156,7 +1156,7 @@ async def run_twitter_simulation(
     # Twitter 使用通用 LLM 配置
     model = create_model(config, use_boost=False)
     
-    # OASIS Twitter使用CSV格式
+    # OASIS TwitteruseCSVformat
     profile_path = os.path.join(simulation_dir, "twitter_profiles.csv")
     if not os.path.exists(profile_path):
         log_info(f"错误: Profile文件不存在: {profile_path}")
@@ -1195,11 +1195,11 @@ async def run_twitter_simulation(
     total_actions = 0
     last_rowid = 0  # 跟踪数据库中最后处理的行号（使用 rowid 避免 created_at 格式差异）
     
-    # 执行初始事件
+    # executeinitialevent
     event_config = config.get("event_config", {})
     initial_posts = event_config.get("initial_posts", [])
     
-    # 记录 round 0 开始（初始事件阶段）
+    # record round 0 begin (initialeventphase) 
     if action_logger:
         action_logger.log_round_start(0, 0)  # round 0, simulated_hour 0
     
@@ -1233,11 +1233,11 @@ async def run_twitter_simulation(
             await result.env.step(initial_actions)
             log_info(f"已发布 {len(initial_actions)} 条初始帖子")
     
-    # 记录 round 0 结束
+    # record round 0 end
     if action_logger:
         action_logger.log_round_end(0, initial_action_count)
     
-    # 主模拟循环
+    # mainsimulationloop
     time_config = config.get("time_config", {})
     total_hours = time_config.get("total_simulation_hours", 72)
     minutes_per_round = time_config.get("minutes_per_round", 30)
@@ -1253,7 +1253,7 @@ async def run_twitter_simulation(
     start_time = datetime.now()
     
     for round_num in range(total_rounds):
-        # 检查是否收到退出信号
+        # checkwhetherreceivedexitsignal
         if _shutdown_event and _shutdown_event.is_set():
             if main_logger:
                 main_logger.info(f"收到退出信号，在第 {round_num + 1} 轮停止模拟")
@@ -1386,11 +1386,11 @@ async def run_reddit_simulation(
     total_actions = 0
     last_rowid = 0  # 跟踪数据库中最后处理的行号（使用 rowid 避免 created_at 格式差异）
     
-    # 执行初始事件
+    # executeinitialevent
     event_config = config.get("event_config", {})
     initial_posts = event_config.get("initial_posts", [])
     
-    # 记录 round 0 开始（初始事件阶段）
+    # record round 0 begin (initialeventphase) 
     if action_logger:
         action_logger.log_round_start(0, 0)  # round 0, simulated_hour 0
     
@@ -1432,11 +1432,11 @@ async def run_reddit_simulation(
             await result.env.step(initial_actions)
             log_info(f"已发布 {len(initial_actions)} 条初始帖子")
     
-    # 记录 round 0 结束
+    # record round 0 end
     if action_logger:
         action_logger.log_round_end(0, initial_action_count)
     
-    # 主模拟循环
+    # mainsimulationloop
     time_config = config.get("time_config", {})
     total_hours = time_config.get("total_simulation_hours", 72)
     minutes_per_round = time_config.get("minutes_per_round", 30)
@@ -1452,7 +1452,7 @@ async def run_reddit_simulation(
     start_time = datetime.now()
     
     for round_num in range(total_rounds):
-        # 检查是否收到退出信号
+        # checkwhetherreceivedexitsignal
         if _shutdown_event and _shutdown_event.is_set():
             if main_logger:
                 main_logger.info(f"收到退出信号，在第 {round_num + 1} 轮停止模拟")
@@ -1619,7 +1619,7 @@ async def main():
     log_manager.info("=" * 60)
     log_manager.info(f"模拟循环完成! 总耗时: {total_elapsed:.1f}秒")
     
-    # 是否进入等待命令模式
+    # whetherentering wait-for-command mode
     if wait_for_commands:
         log_manager.info("")
         log_manager.info("=" * 60)
@@ -1637,7 +1637,7 @@ async def main():
         )
         ipc_handler.update_status("alive")
         
-        # 等待命令循环（使用全局 _shutdown_event）
+        # wait for commandloop (useglobal _shutdown_event) 
         try:
             while not _shutdown_event.is_set():
                 should_continue = await ipc_handler.process_commands()
@@ -1646,9 +1646,9 @@ async def main():
                 # 使用 wait_for 替代 sleep，这样可以响应 shutdown_event
                 try:
                     await asyncio.wait_for(_shutdown_event.wait(), timeout=0.5)
-                    break  # 收到退出信号
+                    break  # receivedexitsignal
                 except asyncio.TimeoutError:
-                    pass  # 超时继续循环
+                    pass  # timeoutcontinueloop
         except KeyboardInterrupt:
             print("\n收到中断信号")
         except asyncio.CancelledError:
@@ -1659,7 +1659,7 @@ async def main():
         log_manager.info("\n关闭环境...")
         ipc_handler.update_status("stopped")
     
-    # 关闭环境
+    # closeenvironment
     if twitter_result and twitter_result.env:
         await twitter_result.env.close()
         log_manager.info("[Twitter] 环境已关闭")
@@ -1683,9 +1683,9 @@ def setup_signal_handlers(loop=None):
     
     持久化模拟场景：模拟完成后不退出，等待 interview 命令
     当收到终止信号时，需要：
-    1. 通知 asyncio 循环退出等待
+    1. notify asyncio loopexitwait
     2. 让程序有机会正常清理资源（关闭数据库、环境等）
-    3. 然后才退出
+    3. thenthenexit
     """
     def signal_handler(signum, frame):
         global _cleanup_done

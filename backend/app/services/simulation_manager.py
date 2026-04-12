@@ -1,5 +1,5 @@
 """
-OASIS模拟管理器
+OASISsimulation manager
 管理Twitter和Reddit双平台并行模拟
 使用预设脚本 + LLM智能生成配置参数
 """
@@ -23,7 +23,7 @@ logger = get_logger('mirofish.simulation')
 
 
 class SimulationStatus(str, Enum):
-    """模拟状态"""
+    """simulation status"""
     CREATED = "created"
     PREPARING = "preparing"
     READY = "ready"
@@ -35,31 +35,31 @@ class SimulationStatus(str, Enum):
 
 
 class PlatformType(str, Enum):
-    """平台类型"""
+    """platformtype"""
     TWITTER = "twitter"
     REDDIT = "reddit"
 
 
 @dataclass
 class SimulationState:
-    """模拟状态"""
+    """simulation status"""
     simulation_id: str
     project_id: str
     graph_id: str
     
-    # 平台启用状态
+    # platformenablestatus
     enable_twitter: bool = True
     enable_reddit: bool = True
     
-    # 状态
+    # status
     status: SimulationStatus = SimulationStatus.CREATED
     
-    # 准备阶段数据
+    # preparation phasedata
     entities_count: int = 0
     profiles_count: int = 0
     entity_types: List[str] = field(default_factory=list)
     
-    # 配置生成信息
+    # configgenerateinfo
     config_generated: bool = False
     config_reasoning: str = ""
     
@@ -72,11 +72,11 @@ class SimulationState:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
     
-    # 错误信息
+    # error info
     error: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
-        """完整状态字典（内部使用）"""
+        """completestatusdict (internaluse) """
         return {
             "simulation_id": self.simulation_id,
             "project_id": self.project_id,
@@ -114,30 +114,30 @@ class SimulationState:
 
 class SimulationManager:
     """
-    模拟管理器
+    simulation manager
     
-    核心功能：
+    corefeature: 
     1. 从Zep图谱读取实体并过滤
-    2. 生成OASIS Agent Profile
-    3. 使用LLM智能生成模拟配置参数
+    2. generateOASIS Agent Profile
+    3. useLLMsmartgeneratesimulation configparameter
     4. 准备预设脚本所需的所有文件
     """
     
-    # 模拟数据存储目录
+    # simulation datastoragedirectory
     SIMULATION_DATA_DIR = os.path.join(
         os.path.dirname(__file__), 
         '../../uploads/simulations'
     )
     
     def __init__(self):
-        # 确保目录存在
+        # ensuredirectoryexists
         os.makedirs(self.SIMULATION_DATA_DIR, exist_ok=True)
         
         # 内存中的模拟状态缓存
         self._simulations: Dict[str, SimulationState] = {}
     
     def _get_simulation_dir(self, simulation_id: str) -> str:
-        """获取模拟数据目录"""
+        """getsimulation datadirectory"""
         sim_dir = os.path.join(self.SIMULATION_DATA_DIR, simulation_id)
         os.makedirs(sim_dir, exist_ok=True)
         return sim_dir
@@ -301,7 +301,7 @@ class SimulationManager:
                 self._save_simulation_state(state)
                 return state
             
-            # ========== 阶段2: 生成Agent Profile ==========
+            # ========== phase2: generateAgent Profile ==========
             total_entities = len(filtered.entities)
             
             if progress_callback:
@@ -341,14 +341,14 @@ class SimulationManager:
                 use_llm=use_llm_for_profiles,
                 progress_callback=profile_progress,
                 graph_id=state.graph_id,  # 传入graph_id用于Zep检索
-                parallel_count=parallel_profile_count,  # 并行生成数量
-                realtime_output_path=realtime_output_path,  # 实时保存路径
-                output_platform=realtime_platform  # 输出格式
+                parallel_count=parallel_profile_count,  # parallelgeneratecount
+                realtime_output_path=realtime_output_path,  # real-timesavepath
+                output_platform=realtime_platform  # outputformat
             )
             
             state.profiles_count = len(profiles)
             
-            # 保存Profile文件（注意：Twitter使用CSV格式，Reddit使用JSON格式）
+            # saveProfilefile (note: TwitteruseCSVformat, ReddituseJSONformat) 
             # Reddit 已经在生成过程中实时保存了，这里再保存一次确保完整性
             if progress_callback:
                 progress_callback(
@@ -381,7 +381,7 @@ class SimulationManager:
                     total=len(profiles)
                 )
             
-            # ========== 阶段3: LLM智能生成模拟配置 ==========
+            # ========== phase3: LLMsmartgeneratesimulation config ==========
             if progress_callback:
                 progress_callback(
                     "generating_config", 0,
@@ -419,7 +419,7 @@ class SimulationManager:
                     total=3
                 )
             
-            # 保存配置文件
+            # saveconfig file
             config_path = os.path.join(sim_dir, "simulation_config.json")
             with open(config_path, 'w', encoding='utf-8') as f:
                 f.write(sim_params.to_json())
@@ -438,7 +438,7 @@ class SimulationManager:
             # 注意：运行脚本保留在 backend/scripts/ 目录，不再复制到模拟目录
             # 启动模拟时，simulation_runner 会从 scripts/ 目录运行脚本
             
-            # 更新状态
+            # updatestatus
             state.status = SimulationStatus.READY
             self._save_simulation_state(state)
             
@@ -457,7 +457,7 @@ class SimulationManager:
             raise
     
     def get_simulation(self, simulation_id: str) -> Optional[SimulationState]:
-        """获取模拟状态"""
+        """getsimulation status"""
         return self._load_simulation_state(simulation_id)
     
     def list_simulations(self, project_id: Optional[str] = None) -> List[SimulationState]:
@@ -494,7 +494,7 @@ class SimulationManager:
             return json.load(f)
     
     def get_simulation_config(self, simulation_id: str) -> Optional[Dict[str, Any]]:
-        """获取模拟配置"""
+        """getsimulation config"""
         sim_dir = self._get_simulation_dir(simulation_id)
         config_path = os.path.join(sim_dir, "simulation_config.json")
         
@@ -505,7 +505,7 @@ class SimulationManager:
             return json.load(f)
     
     def get_run_instructions(self, simulation_id: str) -> Dict[str, str]:
-        """获取运行说明"""
+        """getrundescription"""
         sim_dir = self._get_simulation_dir(simulation_id)
         config_path = os.path.join(sim_dir, "simulation_config.json")
         scripts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts'))

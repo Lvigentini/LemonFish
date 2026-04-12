@@ -1,5 +1,5 @@
 """
-文件解析工具
+fileparsetool
 支持PDF、Markdown、TXT文件的文本提取
 """
 
@@ -16,12 +16,12 @@ def _read_text_with_fallback(file_path: str) -> str:
     
     采用多级回退策略：
     1. 首先尝试 UTF-8 解码
-    2. 使用 charset_normalizer 检测编码
+    2. use charset_normalizer detectencode
     3. 回退到 chardet 检测编码
-    4. 最终使用 UTF-8 + errors='replace' 兜底
+    4. finallyuse UTF-8 + errors='replace' fallback
     
     Args:
-        file_path: 文件路径
+        file_path: filepath
         
     Returns:
         解码后的文本内容
@@ -34,7 +34,7 @@ def _read_text_with_fallback(file_path: str) -> str:
     except UnicodeDecodeError:
         pass
     
-    # 尝试使用 charset_normalizer 检测编码
+    # attemptuse charset_normalizer detectencode
     encoding = None
     try:
         from charset_normalizer import from_bytes
@@ -53,7 +53,7 @@ def _read_text_with_fallback(file_path: str) -> str:
         except Exception:
             pass
     
-    # 最终兜底：使用 UTF-8 + replace
+    # finallyfallback: use UTF-8 + replace
     if not encoding:
         encoding = 'utf-8'
     
@@ -72,7 +72,7 @@ class FileParser:
         从文件中提取文本
 
         Args:
-            file_path: 文件路径
+            file_path: filepath
 
         Returns:
             提取的文本内容
@@ -214,7 +214,7 @@ class FileParser:
         从多个文件提取文本并合并
         
         Args:
-            file_paths: 文件路径列表
+            file_paths: filepathlist
             
         Returns:
             合并后的文本

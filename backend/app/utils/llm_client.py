@@ -1,5 +1,5 @@
 """
-LLM客户端封装
+LLM client wrapper
 统一使用OpenAI格式调用，带重试、退避和备用模型支持
 """
 
@@ -23,7 +23,7 @@ _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class LLMClient:
-    """LLM客户端 with retry, backoff, and fallback model support"""
+    """LLM client with retry, backoff, and fallback model support"""
 
     def __init__(
         self,

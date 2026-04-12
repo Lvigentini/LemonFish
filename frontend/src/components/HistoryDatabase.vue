@@ -55,7 +55,7 @@
           <!-- 角落装饰 - 取景框风格 -->
           <div class="corner-mark top-left-only"></div>
           
-          <!-- 文件列表 -->
+          <!-- filelist -->
           <div class="files-list" v-if="project.files && project.files.length > 0">
             <div 
               v-for="(file, fileIndex) in project.files.slice(0, 3)" 
@@ -99,7 +99,7 @@
       </div>
     </div>
 
-    <!-- 加载状态 -->
+    <!-- loading state -->
     <div v-if="loading" class="loading-state">
       <span class="loading-spinner"></span>
       <span class="loading-text">{{ $t('history.loadingText') }}</span>
@@ -124,13 +124,13 @@
 
             <!-- 弹窗内容 -->
             <div class="modal-body">
-              <!-- 模拟需求 -->
+              <!-- simulation requirement -->
               <div class="modal-section">
                 <div class="modal-label">{{ $t('history.simRequirement') }}</div>
                 <div class="modal-requirement">{{ selectedProject.simulation_requirement || $t('common.none') }}</div>
               </div>
 
-              <!-- 文件列表 -->
+              <!-- filelist -->
               <div class="modal-section">
                 <div class="modal-label">{{ $t('history.relatedFiles') }}</div>
                 <div class="modal-files" v-if="selectedProject.files && selectedProject.files.length > 0">
@@ -211,7 +211,7 @@ const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 
-// 状态
+// status
 const projects = ref([])
 const loading = ref(true)
 const isExpanded = ref(false)
@@ -307,10 +307,10 @@ const getProgressClass = (simulation) => {
   const total = simulation.total_rounds || 0
   
   if (total === 0 || current === 0) {
-    // 未开始
+    // not started
     return 'not-started'
   } else if (current >= total) {
-    // 已完成
+    // completed
     return 'completed'
   } else {
     // 进行中
@@ -342,7 +342,7 @@ const formatTime = (dateStr) => {
   }
 }
 
-// 截断文本
+// truncatetext
 const truncateText = (text, maxLength) => {
   if (!text) return ''
   return text.length > maxLength ? text.slice(0, maxLength) + '...' : text
@@ -370,7 +370,7 @@ const formatRounds = (simulation) => {
   return t('history.roundsProgress', { current, total })
 }
 
-// 获取文件类型（用于样式）
+// getfiletype (used forstyle) 
 const getFileType = (filename) => {
   if (!filename) return 'other'
   const ext = filename.split('.').pop()?.toLowerCase()
@@ -386,7 +386,7 @@ const getFileType = (filename) => {
   return typeMap[ext] || 'other'
 }
 
-// 获取文件类型标签文本
+// getfiletypetagtext
 const getFileTypeLabel = (filename) => {
   if (!filename) return 'FILE'
   const ext = filename.split('.').pop()?.toUpperCase()
@@ -470,7 +470,7 @@ const goToResume = () => {
   }
 }
 
-// 加载历史项目
+// loadhistoryproject
 const loadHistory = async () => {
   try {
     loading.value = true
@@ -486,7 +486,7 @@ const loadHistory = async () => {
   }
 }
 
-// 初始化 IntersectionObserver
+// initialise IntersectionObserver
 const initObserver = () => {
   if (observer) {
     observer.disconnect()
@@ -591,7 +591,7 @@ onActivated(() => {
 })
 
 onUnmounted(() => {
-  // 清理 Intersection Observer
+  // cleanup Intersection Observer
   if (observer) {
     observer.disconnect()
     observer = null
@@ -766,7 +766,7 @@ onUnmounted(() => {
   opacity: 0.5;
 }
 
-/* 轮数进度显示 */
+/* round countprogressshow */
 .card-progress {
   display: flex;
   align-items: center;
@@ -780,7 +780,7 @@ onUnmounted(() => {
   font-size: 0.5rem;
 }
 
-/* 进度状态颜色 */
+/* progressstatuscolor */
 .card-progress.completed { color: #10B981; }    /* 已完成 - 绿色 */
 .card-progress.in-progress { color: #F59E0B; }  /* 进行中 - 橙色 */
 .card-progress.not-started { color: #9CA3AF; }  /* 未开始 - 灰色 */
@@ -1031,7 +1031,7 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* 响应式 */
+/* responsive */
 @media (max-width: 1200px) {
   .project-card {
     width: 240px;

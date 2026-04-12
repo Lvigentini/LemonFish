@@ -1,5 +1,5 @@
 """
-任务状态管理
+task state management
 用于跟踪长时间运行的任务（如图谱构建）
 """
 
@@ -14,31 +14,31 @@ from ..utils.locale import t
 
 
 class TaskStatus(str, Enum):
-    """任务状态枚举"""
-    PENDING = "pending"          # 等待中
-    PROCESSING = "processing"    # 处理中
-    COMPLETED = "completed"      # 已完成
-    FAILED = "failed"            # 失败
-    CANCELLED = "cancelled"      # 已取消 (Phase 7)
+    """task status enum"""
+    PENDING = "pending"          # waiting
+    PROCESSING = "processing"    # processing
+    COMPLETED = "completed"      # completed
+    FAILED = "failed"            # failed
+    CANCELLED = "cancelled"      # cancelled (Phase 7)
 
 
 @dataclass
 class Task:
-    """任务数据类"""
+    """task dataclass"""
     task_id: str
     task_type: str
     status: TaskStatus
     created_at: datetime
     updated_at: datetime
-    progress: int = 0              # 总进度百分比 0-100
-    message: str = ""              # 状态消息
-    result: Optional[Dict] = None  # 任务结果
-    error: Optional[str] = None    # 错误信息
-    metadata: Dict = field(default_factory=dict)  # 额外元数据
-    progress_detail: Dict = field(default_factory=dict)  # 详细进度信息
+    progress: int = 0              # overall progress percentage 0-100
+    message: str = ""              # status message
+    result: Optional[Dict] = None  # task result
+    error: Optional[str] = None    # error info
+    metadata: Dict = field(default_factory=dict)  # extra metadata
+    progress_detail: Dict = field(default_factory=dict)  # detailed progress info
     
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
+        """convert to dict"""
         return {
             "task_id": self.task_id,
             "task_type": self.task_type,
@@ -56,15 +56,15 @@ class Task:
 
 class TaskManager:
     """
-    任务管理器
-    线程安全的任务状态管理
+    task manager
+    thread-safe task state management
     """
     
     _instance = None
     _lock = threading.Lock()
 
     def __new__(cls):
-        """单例模式"""
+        """singleton"""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -76,14 +76,14 @@ class TaskManager:
     
     def create_task(self, task_type: str, metadata: Optional[Dict] = None) -> str:
         """
-        创建新任务
+        create a new task
         
         Args:
-            task_type: 任务类型
-            metadata: 额外元数据
+            task_type: task type
+            metadata: extra metadata
             
         Returns:
-            任务ID
+            task ID
         """
         task_id = str(uuid.uuid4())
         now = datetime.now()
@@ -103,7 +103,7 @@ class TaskManager:
         return task_id
     
     def get_task(self, task_id: str) -> Optional[Task]:
-        """获取任务"""
+        """get task"""
         with self._task_lock:
             return self._tasks.get(task_id)
     
@@ -147,7 +147,7 @@ class TaskManager:
                     task.progress_detail = progress_detail
     
     def complete_task(self, task_id: str, result: Dict):
-        """标记任务完成"""
+        """mark task complete"""
         self.update_task(
             task_id,
             status=TaskStatus.COMPLETED,
@@ -157,7 +157,7 @@ class TaskManager:
         )
     
     def fail_task(self, task_id: str, error: str):
-        """标记任务失败"""
+        """mark task failed"""
         self.update_task(
             task_id,
             status=TaskStatus.FAILED,
@@ -201,7 +201,7 @@ class TaskManager:
         )
     
     def list_tasks(self, task_type: Optional[str] = None) -> list:
-        """列出任务"""
+        """list tasks"""
         with self._task_lock:
             tasks = list(self._tasks.values())
             if task_type:
@@ -209,7 +209,7 @@ class TaskManager:
             return [t.to_dict() for t in sorted(tasks, key=lambda x: x.created_at, reverse=True)]
     
     def cleanup_old_tasks(self, max_age_hours: int = 24):
-        """清理旧任务"""
+        """clean up old tasks"""
         from datetime import timedelta
         cutoff = datetime.now() - timedelta(hours=max_age_hours)
         

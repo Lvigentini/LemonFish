@@ -4,10 +4,10 @@
 实现全程自动化，无需人工设置参数
 
 采用分步生成策略，避免一次性生成过长内容导致失败：
-1. 生成时间配置
-2. 生成事件配置
+1. generatetimeconfig
+2. generateeventconfig
 3. 分批生成Agent配置
-4. 生成平台配置
+4. generateplatformconfig
 """
 
 import json
@@ -47,7 +47,7 @@ CHINA_TIMEZONE_CONFIG = {
     "dead_hours": [0, 1, 2, 3, 4, 5],
     # 早间时段（逐渐醒来）
     "morning_hours": [6, 7, 8],
-    # 工作时段
+    # work hours
     "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
     # 晚间高峰（最活跃）
     "peak_hours": [19, 20, 21, 22],
@@ -100,7 +100,7 @@ class AgentActivityConfig:
 class TimeSimulationConfig:
     """时间模拟配置（基于中国人作息习惯）"""
     # 模拟总时长（模拟小时数）
-    total_simulation_hours: int = 72  # 默认模拟72小时（3天）
+    total_simulation_hours: int = 72  # defaultsimulation72hour (3day) 
     
     # 每轮代表的时间（模拟分钟）- 默认60分钟（1小时），加快时间流速
     minutes_per_round: int = 60
@@ -117,18 +117,18 @@ class TimeSimulationConfig:
     off_peak_hours: List[int] = field(default_factory=lambda: [0, 1, 2, 3, 4, 5])
     off_peak_activity_multiplier: float = 0.05  # 凌晨活跃度极低
     
-    # 早间时段
+    # morning hours
     morning_hours: List[int] = field(default_factory=lambda: [6, 7, 8])
     morning_activity_multiplier: float = 0.4
     
-    # 工作时段
+    # work hours
     work_hours: List[int] = field(default_factory=lambda: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
     work_activity_multiplier: float = 0.7
 
 
 @dataclass
 class EventConfig:
-    """事件配置"""
+    """eventconfig"""
     # 初始事件（模拟开始时的触发事件）
     initial_posts: List[Dict[str, Any]] = field(default_factory=list)
     
@@ -162,26 +162,26 @@ class PlatformConfig:
 @dataclass
 class SimulationParameters:
     """完整的模拟参数配置"""
-    # 基础信息
+    # baseinfo
     simulation_id: str
     project_id: str
     graph_id: str
     simulation_requirement: str
     
-    # 时间配置
+    # timeconfig
     time_config: TimeSimulationConfig = field(default_factory=TimeSimulationConfig)
     
-    # Agent配置列表
+    # Agentconfiglist
     agent_configs: List[AgentActivityConfig] = field(default_factory=list)
     
-    # 事件配置
+    # eventconfig
     event_config: EventConfig = field(default_factory=EventConfig)
     
-    # 平台配置
+    # platformconfig
     twitter_config: Optional[PlatformConfig] = None
     reddit_config: Optional[PlatformConfig] = None
     
-    # LLM配置
+    # LLMconfig
     llm_model: str = ""
     llm_base_url: str = ""
     
@@ -190,7 +190,7 @@ class SimulationParameters:
     generation_reasoning: str = ""  # LLM的推理说明
     
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
+        """convert to dict"""
         time_dict = asdict(self.time_config)
         return {
             "simulation_id": self.simulation_id,
@@ -209,7 +209,7 @@ class SimulationParameters:
         }
     
     def to_json(self, indent: int = 2) -> str:
-        """转换为JSON字符串"""
+        """convert toJSONstring"""
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
 
 
@@ -223,7 +223,7 @@ class SimulationConfigGenerator:
     采用分步生成策略：
     1. 生成时间配置和事件配置（轻量级）
     2. 分批生成Agent配置（每批10-20个）
-    3. 生成平台配置
+    3. generateplatformconfig
     """
     
     # 上下文最大字符数
@@ -232,10 +232,10 @@ class SimulationConfigGenerator:
     AGENTS_PER_BATCH = 15
     
     # 各步骤的上下文截断长度（字符数）
-    TIME_CONFIG_CONTEXT_LENGTH = 10000   # 时间配置
-    EVENT_CONFIG_CONTEXT_LENGTH = 8000   # 事件配置
-    ENTITY_SUMMARY_LENGTH = 300          # 实体摘要
-    AGENT_SUMMARY_LENGTH = 300           # Agent配置中的实体摘要
+    TIME_CONFIG_CONTEXT_LENGTH = 10000   # timeconfig
+    EVENT_CONFIG_CONTEXT_LENGTH = 8000   # eventconfig
+    ENTITY_SUMMARY_LENGTH = 300          # entitysummary
+    AGENT_SUMMARY_LENGTH = 300           # Agentconfigin theentitysummary
     ENTITIES_PER_TYPE_DISPLAY = 20       # 每类实体显示数量
     
     def __init__(
@@ -303,7 +303,7 @@ class SimulationConfigGenerator:
                 progress_callback(step, total_steps, message)
             logger.info(f"[{step}/{total_steps}] {message}")
         
-        # 1. 构建基础上下文信息
+        # 1. buildbasecontextinfo
         context = self._build_context(
             simulation_requirement=simulation_requirement,
             document_text=document_text,
@@ -312,14 +312,14 @@ class SimulationConfigGenerator:
         
         reasoning_parts = []
         
-        # ========== 步骤1: 生成时间配置 ==========
+        # ========== step1: generatetimeconfig ==========
         report_progress(1, t('progress.generatingTimeConfig'))
         num_entities = len(entities)
         time_config_result = self._generate_time_config(context, num_entities)
         time_config = self._parse_time_config(time_config_result, num_entities)
         reasoning_parts.append(f"{t('progress.timeConfigLabel')}: {time_config_result.get('reasoning', t('common.success'))}")
         
-        # ========== 步骤2: 生成事件配置 ==========
+        # ========== step2: generateeventconfig ==========
         report_progress(2, t('progress.generatingEventConfig'))
         event_config_result = self._generate_event_config(context, simulation_requirement, entities)
         event_config = self._parse_event_config(event_config_result)
@@ -378,7 +378,7 @@ class SimulationConfigGenerator:
                 echo_chamber_strength=0.6
             )
         
-        # 构建最终参数
+        # buildfinallyparameter
         params = SimulationParameters(
             simulation_id=simulation_id,
             project_id=project_id,
@@ -406,12 +406,12 @@ class SimulationConfigGenerator:
     ) -> str:
         """构建LLM上下文，截断到最大长度"""
         
-        # 实体摘要
+        # entitysummary
         entity_summary = self._summarize_entities(entities)
         
-        # 构建上下文
+        # buildcontext
         context_parts = [
-            f"## 模拟需求\n{simulation_requirement}",
+            f"## simulation requirement\n{simulation_requirement}",
             f"\n## 实体信息 ({len(entities)}个)\n{entity_summary}",
         ]
         
@@ -427,7 +427,7 @@ class SimulationConfigGenerator:
         return "\n".join(context_parts)
     
     def _summarize_entities(self, entities: List[EntityNode]) -> str:
-        """生成实体摘要"""
+        """generateentitysummary"""
         lines = []
         
         # 按类型分组
@@ -480,7 +480,7 @@ class SimulationConfigGenerator:
                     logger.warning(f"LLM输出被截断 (attempt {attempt+1})")
                     content = self._fix_truncated_json(content)
                 
-                # 尝试解析JSON
+                # attemptparseJSON
                 try:
                     return json.loads(content)
                 except json.JSONDecodeError as e:
@@ -526,7 +526,7 @@ class SimulationConfigGenerator:
         # 修复被截断的情况
         content = self._fix_truncated_json(content)
         
-        # 提取JSON部分
+        # extractJSONpart
         json_match = re.search(r'\{[\s\S]*\}', content)
         if json_match:
             json_str = json_match.group()
@@ -554,7 +554,7 @@ class SimulationConfigGenerator:
         return None
     
     def _generate_time_config(self, context: str, num_entities: int) -> Dict[str, Any]:
-        """生成时间配置"""
+        """generatetimeconfig"""
         # 使用配置的上下文截断长度
         context_truncated = context[:self.TIME_CONFIG_CONTEXT_LENGTH]
         
@@ -565,7 +565,7 @@ class SimulationConfigGenerator:
 
 {context_truncated}
 
-## 任务
+## task
 请生成时间配置JSON。
 
 ### 基本原则（仅供参考，需根据具体事件和参与群体灵活调整）：
@@ -580,7 +580,7 @@ class SimulationConfigGenerator:
   - 例如：学生群体高峰可能是21-23点；媒体全天活跃；官方机构只在工作时间
   - 例如：突发热点可能导致深夜也有讨论，off_peak_hours 可适当缩短
 
-### 返回JSON格式（不要markdown）
+### returnsJSONformat (do notmarkdown) 
 
 示例：
 {{
@@ -650,14 +650,14 @@ class SimulationConfigGenerator:
             logger.warning(f"agents_per_hour_max ({agents_per_hour_max}) 超过总Agent数 ({num_entities})，已修正")
             agents_per_hour_max = max(agents_per_hour_min + 1, num_entities // 2)
         
-        # 确保 min < max
+        # ensure min < max
         if agents_per_hour_min >= agents_per_hour_max:
             agents_per_hour_min = max(1, agents_per_hour_max // 2)
             logger.warning(f"agents_per_hour_min >= max，已修正为 {agents_per_hour_min}")
         
         return TimeSimulationConfig(
             total_simulation_hours=result.get("total_simulation_hours", 72),
-            minutes_per_round=result.get("minutes_per_round", 60),  # 默认每轮1小时
+            minutes_per_round=result.get("minutes_per_round", 60),  # defaultper round1hour
             agents_per_hour_min=agents_per_hour_min,
             agents_per_hour_max=agents_per_hour_max,
             peak_hours=result.get("peak_hours", [19, 20, 21, 22]),
@@ -709,7 +709,7 @@ class SimulationConfigGenerator:
 ## 可用实体类型及示例
 {type_info}
 
-## 任务
+## task
 请生成事件配置JSON：
 - 提取热点话题关键词
 - 描述舆论发展方向
@@ -744,7 +744,7 @@ class SimulationConfigGenerator:
             }
     
     def _parse_event_config(self, result: Dict[str, Any]) -> EventConfig:
-        """解析事件配置结果"""
+        """parseeventconfigresult"""
         return EventConfig(
             initial_posts=result.get("initial_posts", []),
             scheduled_events=[],
@@ -796,7 +796,7 @@ class SimulationConfigGenerator:
             # 尝试找到匹配的 agent
             matched_agent_id = None
             
-            # 1. 直接匹配
+            # 1. directlymatch
             if poster_type in agents_by_type:
                 agents = agents_by_type[poster_type]
                 idx = used_indices.get(poster_type, 0) % len(agents)
@@ -861,12 +861,12 @@ class SimulationConfigGenerator:
 
 模拟需求: {simulation_requirement}
 
-## 实体列表
+## entitylist
 ```json
 {json.dumps(entity_list, ensure_ascii=False, indent=2)}
 ```
 
-## 任务
+## task
 为每个实体生成活动配置，注意：
 - **时间符合目标用户群体作息**：以下为参考（东八区），请根据模拟场景调整
 - **官方机构**（University/GovernmentAgency）：活跃度低(0.1-0.3)，工作时间(9-17)活动，响应慢(60-240分钟)，影响力高(2.5-3.0)
@@ -903,7 +903,7 @@ class SimulationConfigGenerator:
             logger.warning(f"Agent配置批次LLM生成失败: {e}, 使用规则生成")
             llm_configs = {}
         
-        # 构建AgentActivityConfig对象
+        # buildAgentActivityConfigobject
         configs = []
         for i, entity in enumerate(entities):
             agent_id = start_idx + i

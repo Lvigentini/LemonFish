@@ -5,12 +5,12 @@ OASIS Twitter模拟预设脚本
 功能特性:
 - 完成模拟后不立即关闭环境，进入等待命令模式
 - 支持通过IPC接收Interview命令
-- 支持单个Agent采访和批量采访
+- supportsingleAgentinterviewandbatchinterview
 - 支持远程关闭环境命令
 
 使用方式:
     python run_twitter_simulation.py --config /path/to/simulation_config.json
-    python run_twitter_simulation.py --config /path/to/simulation_config.json --no-wait  # 完成后立即关闭
+    python run_twitter_simulation.py --config /path/to/simulation_config.json --no-wait  # completebackimmediatelyclose
 """
 
 import argparse
@@ -25,11 +25,11 @@ import sqlite3
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-# 全局变量：用于信号处理
+# globalvariables: used forsignalprocess
 _shutdown_event = None
 _cleanup_done = False
 
-# 添加项目路径
+# addprojectpath
 _scripts_dir = os.path.dirname(os.path.abspath(__file__))
 _backend_dir = os.path.abspath(os.path.join(_scripts_dir, '..'))
 _project_root = os.path.abspath(os.path.join(_backend_dir, '..'))
@@ -169,12 +169,12 @@ class IPCHandler:
         self.status_file = os.path.join(simulation_dir, ENV_STATUS_FILE)
         self._running = True
         
-        # 确保目录存在
+        # ensuredirectoryexists
         os.makedirs(self.commands_dir, exist_ok=True)
         os.makedirs(self.responses_dir, exist_ok=True)
     
     def update_status(self, status: str):
-        """更新环境状态"""
+        """updateenvironmentstatus"""
         with open(self.status_file, 'w', encoding='utf-8') as f:
             json.dump({
                 "status": status,
@@ -205,7 +205,7 @@ class IPCHandler:
         return None
     
     def send_response(self, command_id: str, status: str, result: Dict = None, error: str = None):
-        """发送响应"""
+        """sendresponse"""
         response = {
             "command_id": command_id,
             "status": status,
@@ -218,7 +218,7 @@ class IPCHandler:
         with open(response_file, 'w', encoding='utf-8') as f:
             json.dump(response, f, ensure_ascii=False, indent=2)
         
-        # 删除命令文件
+        # deletecommandfile
         command_file = os.path.join(self.commands_dir, f"{command_id}.json")
         try:
             os.remove(command_file)
@@ -227,22 +227,22 @@ class IPCHandler:
     
     async def handle_interview(self, command_id: str, agent_id: int, prompt: str) -> bool:
         """
-        处理单个Agent采访命令
+        processsingleAgentinterviewcommand
         
         Returns:
-            True 表示成功，False 表示失败
+            True meanssuccess, False meansfailed
         """
         try:
-            # 获取Agent
+            # getAgent
             agent = self.agent_graph.get_agent(agent_id)
             
-            # 创建Interview动作
+            # createInterviewaction
             interview_action = ManualAction(
                 action_type=ActionType.INTERVIEW,
                 action_args={"prompt": prompt}
             )
             
-            # 执行Interview
+            # executeInterview
             actions = {agent: interview_action}
             await self.env.step(actions)
             
@@ -261,13 +261,13 @@ class IPCHandler:
     
     async def handle_batch_interview(self, command_id: str, interviews: List[Dict]) -> bool:
         """
-        处理批量采访命令
+        processbatchinterviewcommand
         
         Args:
             interviews: [{"agent_id": int, "prompt": str}, ...]
         """
         try:
-            # 构建动作字典
+            # buildactiondict
             actions = {}
             agent_prompts = {}  # 记录每个agent的prompt
             
@@ -289,10 +289,10 @@ class IPCHandler:
                 self.send_response(command_id, "failed", error="没有有效的Agent")
                 return False
             
-            # 执行批量Interview
+            # executebatchInterview
             await self.env.step(actions)
             
-            # 获取所有结果
+            # getallresult
             results = {}
             for agent_id in agent_prompts.keys():
                 result = self._get_interview_result(agent_id)
@@ -397,7 +397,7 @@ class IPCHandler:
 
 
 class TwitterSimulationRunner:
-    """Twitter模拟运行器"""
+    """Twittersimulation runner"""
     
     # Twitter可用动作（不包含INTERVIEW，INTERVIEW只能通过ManualAction手动触发）
     AVAILABLE_ACTIONS = [
@@ -411,11 +411,11 @@ class TwitterSimulationRunner:
     
     def __init__(self, config_path: str, wait_for_commands: bool = True):
         """
-        初始化模拟运行器
+        initialisesimulation runner
         
         Args:
-            config_path: 配置文件路径 (simulation_config.json)
-            wait_for_commands: 模拟完成后是否等待命令（默认True）
+            config_path: config filepath (simulation_config.json)
+            wait_for_commands: simulationcompletebackwhetherwait for command (defaultTrue) 
         """
         self.config_path = config_path
         self.config = self._load_config()
@@ -426,26 +426,26 @@ class TwitterSimulationRunner:
         self.ipc_handler = None
         
     def _load_config(self) -> Dict[str, Any]:
-        """加载配置文件"""
+        """loadconfig file"""
         with open(self.config_path, 'r', encoding='utf-8') as f:
             return json.load(f)
     
     def _get_profile_path(self) -> str:
-        """获取Profile文件路径（OASIS Twitter使用CSV格式）"""
+        """getProfilefilepath (OASIS TwitteruseCSVformat) """
         return os.path.join(self.simulation_dir, "twitter_profiles.csv")
     
     def _get_db_path(self) -> str:
-        """获取数据库路径"""
+        """getdatabasepath"""
         return os.path.join(self.simulation_dir, "twitter_simulation.db")
     
     def _create_model(self):
         """
-        创建LLM模型
+        createLLMmodel
         
         统一使用项目根目录 .env 文件中的配置（优先级最高）：
         - LLM_API_KEY: API密钥
-        - LLM_BASE_URL: API基础URL
-        - LLM_MODEL_NAME: 模型名称
+        - LLM_BASE_URL: APIbaseURL
+        - LLM_MODEL_NAME: modelname
         """
         # Prefer LLM_SIMULATION_* override, fall back to primary LLM_*
         sim_api_key = os.environ.get("LLM_SIMULATION_API_KEY", "")
@@ -499,7 +499,7 @@ class TwitterSimulationRunner:
         time_config = self.config.get("time_config", {})
         agent_configs = self.config.get("agent_configs", [])
         
-        # 基础激活数量
+        # baseactivatecount
         base_min = time_config.get("agents_per_hour_min", 5)
         base_max = time_config.get("agents_per_hour_max", 20)
         
@@ -537,7 +537,7 @@ class TwitterSimulationRunner:
             min(target_count, len(candidates))
         ) if candidates else []
         
-        # 转换为Agent对象
+        # convert toAgentobject
         active_agents = []
         for agent_id in selected_ids:
             try:
@@ -549,10 +549,10 @@ class TwitterSimulationRunner:
         return active_agents
     
     async def run(self, max_rounds: int = None):
-        """运行Twitter模拟
+        """runTwittersimulation
         
         Args:
-            max_rounds: 最大模拟轮数（可选，用于截断过长的模拟）
+            max_rounds: maxsimulationround count (optional, used fortruncate overly longsimulation) 
         """
         print("=" * 60)
         print("OASIS Twitter模拟")
@@ -561,7 +561,7 @@ class TwitterSimulationRunner:
         print(f"等待命令模式: {'启用' if self.wait_for_commands else '禁用'}")
         print("=" * 60)
         
-        # 加载时间配置
+        # loadtimeconfig
         time_config = self.config.get("time_config", {})
         total_hours = time_config.get("total_simulation_hours", 72)
         minutes_per_round = time_config.get("minutes_per_round", 30)
@@ -584,7 +584,7 @@ class TwitterSimulationRunner:
             print(f"  - 最大轮数限制: {max_rounds}")
         print(f"  - Agent数量: {len(self.config.get('agent_configs', []))}")
         
-        # 创建模型
+        # createmodel
         print("\n初始化LLM模型...")
         model = self._create_model()
         
@@ -601,13 +601,13 @@ class TwitterSimulationRunner:
             available_actions=self.AVAILABLE_ACTIONS,
         )
         
-        # 数据库路径
+        # databasepath
         db_path = self._get_db_path()
         if os.path.exists(db_path):
             os.remove(db_path)
             print(f"已删除旧数据库: {db_path}")
         
-        # 创建环境
+        # createenvironment
         print("创建OASIS环境...")
         self.env = oasis.make(
             agent_graph=self.agent_graph,
@@ -623,7 +623,7 @@ class TwitterSimulationRunner:
         self.ipc_handler = IPCHandler(self.simulation_dir, self.env, self.agent_graph)
         self.ipc_handler.update_status("running")
         
-        # 执行初始事件
+        # executeinitialevent
         event_config = self.config.get("event_config", {})
         initial_posts = event_config.get("initial_posts", [])
         
@@ -646,7 +646,7 @@ class TwitterSimulationRunner:
                 await self.env.step(initial_actions)
                 print(f"  已发布 {len(initial_actions)} 条初始帖子")
         
-        # 主模拟循环
+        # mainsimulationloop
         print("\n开始模拟循环...")
         start_time = datetime.now()
         
@@ -664,13 +664,13 @@ class TwitterSimulationRunner:
             if not active_agents:
                 continue
             
-            # 构建动作
+            # buildaction
             actions = {
                 agent: LLMAction()
                 for _, agent in active_agents
             }
             
-            # 执行动作
+            # executeaction
             await self.env.step(actions)
             
             # 打印进度
@@ -687,7 +687,7 @@ class TwitterSimulationRunner:
         print(f"  - 总耗时: {total_elapsed:.1f}秒")
         print(f"  - 数据库: {db_path}")
         
-        # 是否进入等待命令模式
+        # whetherentering wait-for-command mode
         if self.wait_for_commands:
             print("\n" + "=" * 60)
             print("进入等待命令模式 - 环境保持运行")
@@ -696,7 +696,7 @@ class TwitterSimulationRunner:
             
             self.ipc_handler.update_status("alive")
             
-            # 等待命令循环（使用全局 _shutdown_event）
+            # wait for commandloop (useglobal _shutdown_event) 
             try:
                 while not _shutdown_event.is_set():
                     should_continue = await self.ipc_handler.process_commands()
@@ -704,7 +704,7 @@ class TwitterSimulationRunner:
                         break
                     try:
                         await asyncio.wait_for(_shutdown_event.wait(), timeout=0.5)
-                        break  # 收到退出信号
+                        break  # receivedexitsignal
                     except asyncio.TimeoutError:
                         pass
             except KeyboardInterrupt:
@@ -716,7 +716,7 @@ class TwitterSimulationRunner:
             
             print("\n关闭环境...")
         
-        # 关闭环境
+        # closeenvironment
         self.ipc_handler.update_status("stopped")
         await self.env.close()
         

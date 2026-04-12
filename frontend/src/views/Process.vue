@@ -1,10 +1,10 @@
 <template>
   <div class="process-page">
-    <!-- 顶部导航栏 -->
+    <!-- top navigation bar -->
     <nav class="navbar">
       <div class="nav-brand" @click="goHome">MIROFISH <span style="font-weight:500;font-size:0.72em;color:#DAA520;letter-spacing:0.5px;">[LEMONFISH]</span></div>
       
-      <!-- 中间步骤指示器 -->
+      <!-- middle step indicator -->
       <div class="nav-center">
         <div class="step-badge">STEP 01</div>
         <div class="step-name">图谱构建</div>
@@ -16,9 +16,9 @@
       </div>
     </nav>
 
-    <!-- 主内容区 -->
+    <!-- main content area -->
     <div class="main-content">
-      <!-- 左侧: 实时图谱展示 -->
+      <!-- left: real-time graph view -->
       <div class="left-panel" :class="{ 'full-screen': isFullScreen }">
         <div class="panel-header">
           <div class="header-left">
@@ -427,26 +427,26 @@ const router = useRouter()
 // 当前项目ID（可能从'new'变为实际ID）
 const currentProjectId = ref(route.params.projectId)
 
-// 状态
+// status
 const loading = ref(true)
 const graphLoading = ref(false)
 const error = ref('')
 const projectData = ref(null)
 const graphData = ref(null)
 const buildProgress = ref(null)
-const ontologyProgress = ref(null) // 本体生成进度
+const ontologyProgress = ref(null) // ontology generationprogress
 const currentPhase = ref(-1) // -1: 上传中, 0: 本体生成中, 1: 图谱构建, 2: 完成
-const selectedItem = ref(null) // 选中的节点或边
+const selectedItem = ref(null) // selected node or edge
 const isFullScreen = ref(false)
 
-// DOM引用
+// DOM refs
 const graphContainer = ref(null)
 const graphSvg = ref(null)
 
-// 轮询定时器
+// polling timer
 let pollTimer = null
 
-// 计算属性
+// computed
 const statusClass = computed(() => {
   if (error.value) return 'error'
   if (currentPhase.value >= 2) return 'completed'
@@ -478,13 +478,13 @@ const entityTypes = computed(() => {
   return Object.values(typeMap)
 })
 
-// 方法
+// method
 const goHome = () => {
   router.push('/')
 }
 
 const goToNextStep = () => {
-  // TODO: 进入环境搭建步骤
+  // TODO: proceed to environment setupstep
   alert('环境搭建功能开发中...')
 }
 
@@ -496,12 +496,12 @@ const toggleFullScreen = () => {
   }, 350) 
 }
 
-// 关闭详情面板
+// close details panel
 const closeDetailPanel = () => {
   selectedItem.value = null
 }
 
-// 格式化日期
+// format date
 const formatDate = (dateStr) => {
   if (!dateStr) return '-'
   try {
@@ -518,7 +518,7 @@ const formatDate = (dateStr) => {
   }
 }
 
-// 选中节点
+// select node
 const selectNode = (nodeData, color) => {
   selectedItem.value = {
     type: 'node',
@@ -528,7 +528,7 @@ const selectNode = (nodeData, color) => {
   }
 }
 
-// 选中边
+// select edge
 const selectEdge = (edgeData) => {
   selectedItem.value = {
     type: 'edge',
@@ -553,7 +553,7 @@ const getPhaseStatusText = (phase) => {
   return t('common.pending')
 }
 
-// 初始化 - 处理新建项目或加载已有项目
+// initialise — handle new project or load existing
 const initProject = async () => {
   const paramProjectId = route.params.projectId
   
@@ -561,13 +561,13 @@ const initProject = async () => {
     // 新建项目：从 store 获取待上传的数据
     await handleNewProject()
   } else {
-    // 加载已有项目
+    // load existing project
     currentProjectId.value = paramProjectId
     await loadProject()
   }
 }
 
-// 处理新建项目 - 调用 ontology/generate API
+// handle new project - call ontology/generate API
 const handleNewProject = async () => {
   const pending = getPendingUpload()
   
@@ -579,28 +579,28 @@ const handleNewProject = async () => {
   
   try {
     loading.value = true
-    currentPhase.value = 0 // 本体生成阶段
+    currentPhase.value = 0 // ontology generation phase
     ontologyProgress.value = { message: '正在上传文件并分析文档...' }
     
-    // 构建 FormData
+    // build FormData
     const formDataObj = new FormData()
     pending.files.forEach(file => {
       formDataObj.append('files', file)
     })
     formDataObj.append('simulation_requirement', pending.simulationRequirement)
     
-    // 调用本体生成 API
+    // callontology generation API
     const response = await generateOntology(formDataObj)
     
     if (response.success) {
-      // 清除待上传数据
+      // clear pending upload data
       clearPendingUpload()
       
-      // 更新项目ID和数据
+      // update project ID and data
       currentProjectId.value = response.data.project_id
       projectData.value = response.data
       
-      // 更新URL（不刷新页面）
+      // update URL (without page reload) 
       router.replace({
         name: 'Process',
         params: { projectId: response.data.project_id }
@@ -608,7 +608,7 @@ const handleNewProject = async () => {
       
       ontologyProgress.value = null
       
-      // 自动开始图谱构建
+      // auto-start graph build
       await startBuildGraph()
     } else {
       error.value = response.error || '本体生成失败'
@@ -621,7 +621,7 @@ const handleNewProject = async () => {
   }
 }
 
-// 加载已有项目数据
+// load existing projectdata
 const loadProject = async () => {
   try {
     loading.value = true
@@ -631,7 +631,7 @@ const loadProject = async () => {
       projectData.value = response.data
       updatePhaseByStatus(response.data.status)
       
-      // 自动开始图谱构建
+      // auto-start graph build
       if (response.data.status === 'ontology_generated' && !response.data.graph_id) {
         await startBuildGraph()
       }
@@ -676,11 +676,11 @@ const updatePhaseByStatus = (status) => {
   }
 }
 
-// 开始构建图谱
+// begin graph build
 const startBuildGraph = async () => {
   try {
     currentPhase.value = 1
-    // 设置初始进度
+    // setinitialprogress
     buildProgress.value = {
       progress: 0,
       message: '正在启动图谱构建...'
@@ -691,13 +691,13 @@ const startBuildGraph = async () => {
     if (response.success) {
       buildProgress.value.message = '图谱构建任务已启动...'
       
-      // 保存 task_id 用于轮询
+      // save task_id used forpoll
       const taskId = response.data.task_id
       
       // 启动图谱数据轮询（独立于任务状态轮询）
       startGraphPolling()
       
-      // 启动任务状态轮询
+      // starttaskstatuspoll
       startPollingTask(taskId)
     } else {
       error.value = response.error || '启动图谱构建失败'
@@ -710,10 +710,10 @@ const startBuildGraph = async () => {
   }
 }
 
-// 图谱数据轮询定时器
+// graph datapolling timer
 let graphPollTimer = null
 
-// 启动图谱数据轮询
+// startgraph datapoll
 const startGraphPolling = () => {
   // 立即获取一次
   fetchGraphData()
@@ -724,14 +724,14 @@ const startGraphPolling = () => {
   }, 10000)
 }
 
-// 手动刷新图谱
+// manualrefresh graph
 const refreshGraph = async () => {
   graphLoading.value = true
   await fetchGraphData()
   graphLoading.value = false
 }
 
-// 停止图谱数据轮询
+// stopgraph datapoll
 const stopGraphPolling = () => {
   if (graphPollTimer) {
     clearInterval(graphPollTimer)
@@ -739,7 +739,7 @@ const stopGraphPolling = () => {
   }
 }
 
-// 获取图谱数据
+// getgraph data
 const fetchGraphData = async () => {
   try {
     // 先获取项目信息以获取 graph_id
@@ -749,7 +749,7 @@ const fetchGraphData = async () => {
       const graphId = projectResponse.data.graph_id
       projectData.value = projectResponse.data
       
-      // 获取图谱数据
+      // getgraph data
       const graphResponse = await getGraphData(graphId)
       
       if (graphResponse.success && graphResponse.data) {
@@ -772,18 +772,18 @@ const fetchGraphData = async () => {
   }
 }
 
-// 轮询任务状态
+// polltaskstatus
 const startPollingTask = (taskId) => {
   // 立即执行一次查询
   pollTaskStatus(taskId)
   
-  // 然后定时轮询
+  // thenscheduledpoll
   pollTimer = setInterval(() => {
     pollTaskStatus(taskId)
   }, 2000)
 }
 
-// 查询任务状态
+// query taskstatus
 const pollTaskStatus = async (taskId) => {
   try {
     const response = await getTaskStatus(taskId)
@@ -791,7 +791,7 @@ const pollTaskStatus = async (taskId) => {
     if (response.success) {
       const task = response.data
       
-      // 更新进度显示
+      // updateprogressshow
       buildProgress.value = {
         progress: task.progress || 0,
         message: task.message || '处理中...'
@@ -817,7 +817,7 @@ const pollTaskStatus = async (taskId) => {
         if (projectResponse.success) {
           projectData.value = projectResponse.data
           
-          // 最终加载完整图谱数据
+          // finallyloadcompletegraph data
           if (projectResponse.data.graph_id) {
             console.log('📊 加载完整图谱:', projectResponse.data.graph_id)
             await loadGraph(projectResponse.data.graph_id)
@@ -846,7 +846,7 @@ const stopPolling = () => {
   }
 }
 
-// 加载图谱数据
+// loadgraph data
 const loadGraph = async (graphId) => {
   try {
     graphLoading.value = true
@@ -896,7 +896,7 @@ const renderGraph = () => {
   
   svg.selectAll('*').remove()
   
-  // 处理节点数据
+  // processnodedata
   const nodesData = graphData.value.nodes || []
   const edgesData = graphData.value.edges || []
   
@@ -912,7 +912,7 @@ const renderGraph = () => {
     return
   }
   
-  // 创建节点映射用于查找名称
+  // createnodemappingused forlookupname
   const nodeMap = {}
   nodesData.forEach(n => {
     nodeMap[n.uuid] = n
@@ -925,7 +925,7 @@ const renderGraph = () => {
     rawData: n // 保存原始数据
   }))
   
-  // 创建节点ID集合用于过滤有效边
+  // createnodeIDsetused forfiltervalidedge
   const nodeIds = new Set(nodes.map(n => n.id))
   
   const edges = edgesData
@@ -943,7 +943,7 @@ const renderGraph = () => {
   
   console.log('Nodes:', nodes.length, 'Edges:', edges.length)
   
-  // 颜色映射
+  // colormapping
   const types = [...new Set(nodes.map(n => n.type))]
   const colorScale = d3.scaleOrdinal()
     .domain(types)
@@ -992,7 +992,7 @@ const renderGraph = () => {
     .attr('stroke', 'transparent')
     .attr('stroke-width', 10)
   
-  // 边标签
+  // edgetag
   const linkLabel = g.append('g')
     .attr('class', 'link-labels')
     .selectAll('text')
@@ -1036,7 +1036,7 @@ const renderGraph = () => {
     .attr('fill', '#333')
     .attr('font-family', 'JetBrains Mono, monospace')
   
-  // 点击空白处关闭详情面板
+  // click blank area to close details
   svg.on('click', () => {
     closeDetailPanel()
   })
@@ -1049,7 +1049,7 @@ const renderGraph = () => {
       .attr('x2', d => d.target.x)
       .attr('y2', d => d.target.y)
     
-    // 更新边标签位置
+    // updateedgetaglocation
     linkLabel
       .attr('x', d => (d.source.x + d.target.x) / 2)
       .attr('y', d => (d.source.y + d.target.y) / 2 - 5)
@@ -1082,7 +1082,7 @@ watch(graphData, () => {
   }
 })
 
-// 生命周期
+// lifecycle
 onMounted(() => {
   initProject()
 })
@@ -1094,7 +1094,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 变量 */
+/* variables */
 :root {
   --black: #000000;
   --white: #FFFFFF;
@@ -1197,14 +1197,14 @@ onUnmounted(() => {
   color: #999;
 }
 
-/* 主内容区 */
+/* main content area */
 .main-content {
   display: flex;
   height: calc(100vh - 56px);
   position: relative;
 }
 
-/* 左侧面板 - 50% default */
+/* left panel - 50% default */
 .left-panel {
   width: 50%;
   flex: none; /* Fixed width initially */
@@ -1314,7 +1314,7 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* 图谱容器 */
+/* graph container */
 .graph-container {
   flex: 1;
   position: relative;
@@ -1546,7 +1546,7 @@ onUnmounted(() => {
   color: #666;
 }
 
-/* 边详情关系展示 */
+/* edge detailsrelationship display */
 .edge-relation {
   display: flex;
   align-items: center;
@@ -1590,7 +1590,7 @@ onUnmounted(() => {
   border-bottom: 1px solid #E0E0E0;
 }
 
-/* Properties 属性列表 */
+/* Properties properties list */
 .properties-list {
   margin-top: 8px;
   padding: 10px;
@@ -1619,7 +1619,7 @@ onUnmounted(() => {
   word-break: break-word;
 }
 
-/* Episodes 列表 */
+/* Episodes list */
 .episodes-list {
   margin-top: 8px;
   display: flex;
@@ -1644,7 +1644,7 @@ onUnmounted(() => {
   margin-bottom: 10px;
 }
 
-/* 图谱图例 */
+/* graph legend */
 .graph-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1675,7 +1675,7 @@ onUnmounted(() => {
   color: #999;
 }
 
-/* 右侧面板 - 50% default */
+/* right panel - 50% default */
 .right-panel {
   width: 50%;
   flex: none;
@@ -1705,14 +1705,14 @@ onUnmounted(() => {
   margin-right: 8px;
 }
 
-/* 流程内容 */
+/* pipeline content */
 .process-content {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
 }
 
-/* 流程阶段 */
+/* pipeline stage */
 .process-phase {
   margin-bottom: 24px;
   border: 1px solid #E0E0E0;
@@ -1798,12 +1798,12 @@ onUnmounted(() => {
   color: #fff;
 }
 
-/* 阶段详情 */
+/* stage details */
 .phase-detail {
   padding: 16px;
 }
 
-/* 实体标签 */
+/* entity tag */
 .entity-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1818,7 +1818,7 @@ onUnmounted(() => {
   color: #333;
 }
 
-/* 关系列表 */
+/* relationship list */
 .relation-list {
   font-size: 0.8rem;
 }
@@ -1855,7 +1855,7 @@ onUnmounted(() => {
   font-size: 0.75rem;
 }
 
-/* 本体生成进度 */
+/* ontology generationprogress */
 .ontology-progress {
   display: flex;
   align-items: center;
@@ -1879,7 +1879,7 @@ onUnmounted(() => {
   color: #333;
 }
 
-/* 等待状态 */
+/* waiting state */
 .waiting-state {
   padding: 16px;
   background: #F9F9F9;
@@ -1892,7 +1892,7 @@ onUnmounted(() => {
   color: #999;
 }
 
-/* 进度条 */
+/* progress bar */
 .progress-bar {
   height: 6px;
   background: #E0E0E0;
@@ -1921,7 +1921,7 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-/* 构建结果 */
+/* build result */
 .build-result {
   display: flex;
   gap: 16px;
@@ -1949,7 +1949,7 @@ onUnmounted(() => {
   letter-spacing: 0.05em;
 }
 
-/* 下一步按钮 */
+/* next button */
 .next-step-section {
   margin-top: 24px;
   padding-top: 24px;
@@ -1986,7 +1986,7 @@ onUnmounted(() => {
   font-size: 1.2rem;
 }
 
-/* 项目信息面板 */
+/* project info panel */
 .project-panel {
   border-top: 1px solid #E0E0E0;
   background: #FAFAFA;
@@ -2044,7 +2044,7 @@ onUnmounted(() => {
   color: #666;
 }
 
-/* 响应式 */
+/* responsive */
 @media (max-width: 1024px) {
   .main-content {
     flex-direction: column;

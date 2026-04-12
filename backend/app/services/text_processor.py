@@ -1,5 +1,5 @@
 """
-文本处理服务
+text processingservice
 """
 
 from typing import List, Optional
@@ -62,7 +62,7 @@ class TextProcessor:
     
     @staticmethod
     def get_text_stats(text: str) -> dict:
-        """获取文本统计信息"""
+        """gettextstatisticsinfo"""
         return {
             "total_chars": len(text),
             "total_lines": text.count('\n') + 1,

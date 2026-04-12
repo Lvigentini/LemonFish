@@ -2,13 +2,13 @@
 动作日志记录器
 用于记录OASIS模拟中每个Agent的动作，供后端监控使用
 
-日志结构:
+logstructure:
     sim_xxx/
     ├── twitter/
-    │   └── actions.jsonl    # Twitter 平台动作日志
+    │   └── actions.jsonl    # Twitter platformactionlog
     ├── reddit/
-    │   └── actions.jsonl    # Reddit 平台动作日志
-    ├── simulation.log       # 主模拟进程日志
+    │   └── actions.jsonl    # Reddit platformactionlog
+    ├── simulation.log       # mainsimulation processlog
     └── run_state.json       # 运行状态（API 查询用）
 """
 
@@ -27,7 +27,7 @@ class PlatformActionLogger:
         初始化日志记录器
         
         Args:
-            platform: 平台名称 (twitter/reddit)
+            platform: platformname (twitter/reddit)
             base_dir: 模拟目录的基础路径
         """
         self.platform = platform
@@ -37,7 +37,7 @@ class PlatformActionLogger:
         self._ensure_dir()
     
     def _ensure_dir(self):
-        """确保目录存在"""
+        """ensuredirectoryexists"""
         os.makedirs(self.log_dir, exist_ok=True)
     
     def log_action(
@@ -90,7 +90,7 @@ class PlatformActionLogger:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
     
     def log_simulation_start(self, config: Dict[str, Any]):
-        """记录模拟开始"""
+        """recordsimulationbegin"""
         entry = {
             "timestamp": datetime.now().isoformat(),
             "event_type": "simulation_start",
@@ -103,7 +103,7 @@ class PlatformActionLogger:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
     
     def log_simulation_end(self, total_rounds: int, total_actions: int):
-        """记录模拟结束"""
+        """recordsimulation ended"""
         entry = {
             "timestamp": datetime.now().isoformat(),
             "event_type": "simulation_end",
@@ -127,26 +127,26 @@ class SimulationLogManager:
         初始化日志管理器
         
         Args:
-            simulation_dir: 模拟目录路径
+            simulation_dir: simulationdirectorypath
         """
         self.simulation_dir = simulation_dir
         self.twitter_logger: Optional[PlatformActionLogger] = None
         self.reddit_logger: Optional[PlatformActionLogger] = None
         self._main_logger: Optional[logging.Logger] = None
         
-        # 设置主日志
+        # setmainlog
         self._setup_main_logger()
     
     def _setup_main_logger(self):
-        """设置主模拟日志"""
+        """setmainsimulationlog"""
         log_path = os.path.join(self.simulation_dir, "simulation.log")
         
-        # 创建 logger
+        # create logger
         self._main_logger = logging.getLogger(f"simulation.{os.path.basename(self.simulation_dir)}")
         self._main_logger.setLevel(logging.INFO)
         self._main_logger.handlers.clear()
         
-        # 文件处理器
+        # file handler
         file_handler = logging.FileHandler(log_path, encoding='utf-8', mode='w')
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(logging.Formatter(
@@ -155,7 +155,7 @@ class SimulationLogManager:
         ))
         self._main_logger.addHandler(file_handler)
         
-        # 控制台处理器
+        # console handler
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(logging.Formatter(
@@ -179,7 +179,7 @@ class SimulationLogManager:
         return self.reddit_logger
     
     def log(self, message: str, level: str = "info"):
-        """记录主日志"""
+        """recordmainlog"""
         if self._main_logger:
             getattr(self._main_logger, level.lower(), self._main_logger.info)(message)
     

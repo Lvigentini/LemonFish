@@ -215,7 +215,7 @@ class OasisProfileGenerator:
     3. 区分个人实体和抽象群体实体
     """
     
-    # MBTI类型列表
+    # MBTItypelist
     MBTI_TYPES = [
         "INTJ", "INTP", "ENTJ", "ENTP",
         "INFJ", "INFP", "ENFJ", "ENFP",
@@ -295,15 +295,15 @@ class OasisProfileGenerator:
         """
         entity_type = entity.get_entity_type() or "Entity"
         
-        # 基础信息
+        # baseinfo
         name = entity.name
         user_name = self._generate_username(name)
         
-        # 构建上下文信息
+        # buildcontextinfo
         context = self._build_entity_context(entity)
         
         if use_llm:
-            # 使用LLM生成详细人设
+            # useLLMgeneratedetailedpersona
             profile_data = self._generate_profile_with_llm(
                 entity_name=name,
                 entity_type=entity_type,
@@ -378,7 +378,7 @@ class OasisProfileGenerator:
         )
     
     def _generate_username(self, name: str) -> str:
-        """生成用户名"""
+        """generateusername"""
         # 移除特殊字符，转换为小写
         username = name.lower().replace(" ", "_")
         username = ''.join(c for c in username if c.isalnum() or c == '_')
@@ -395,7 +395,7 @@ class OasisProfileGenerator:
         使用并行请求同时搜索，提高效率。
         
         Args:
-            entity: 实体节点对象
+            entity: entity nodeobject
             
         Returns:
             包含facts, node_summaries, context的字典
@@ -471,16 +471,16 @@ class OasisProfileGenerator:
             return None
         
         try:
-            # 并行执行edges和nodes搜索
+            # parallelexecuteedgesandnodessearch
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                 edge_future = executor.submit(search_edges)
                 node_future = executor.submit(search_nodes)
                 
-                # 获取结果
+                # getresult
                 edge_result = edge_future.result(timeout=30)
                 node_result = node_future.result(timeout=30)
             
-            # 处理边搜索结果
+            # processedgesearchresult
             all_facts = set()
             if edge_result and hasattr(edge_result, 'edges') and edge_result.edges:
                 for edge in edge_result.edges:
@@ -488,7 +488,7 @@ class OasisProfileGenerator:
                         all_facts.add(edge.fact)
             results["facts"] = list(all_facts)
             
-            # 处理节点搜索结果
+            # processnodesearchresult
             all_summaries = set()
             if node_result and hasattr(node_result, 'nodes') and node_result.nodes:
                 for node in node_result.nodes:
@@ -519,23 +519,23 @@ class OasisProfileGenerator:
         """
         构建实体的完整上下文信息
         
-        包括：
+        including: 
         1. 实体本身的边信息（事实）
         2. 关联节点的详细信息
         3. Zep混合检索到的丰富信息
         """
         context_parts = []
         
-        # 1. 添加实体属性信息
+        # 1. addentitypropertyinfo
         if entity.attributes:
             attrs = []
             for key, value in entity.attributes.items():
                 if value and str(value).strip():
                     attrs.append(f"- {key}: {value}")
             if attrs:
-                context_parts.append("### 实体属性\n" + "\n".join(attrs))
+                context_parts.append("### entityproperty\n" + "\n".join(attrs))
         
-        # 2. 添加相关边信息（事实/关系）
+        # 2. addrelatededgeinfo (fact/relationship) 
         existing_facts = set()
         if entity.related_edges:
             relationships = []
@@ -554,7 +554,7 @@ class OasisProfileGenerator:
                         relationships.append(f"- (相关实体) --[{edge_name}]--> {entity.name}")
             
             if relationships:
-                context_parts.append("### 相关事实和关系\n" + "\n".join(relationships))
+                context_parts.append("### relatedfactandrelationship\n" + "\n".join(relationships))
         
         # 3. 添加关联节点的详细信息
         if entity.related_nodes:
@@ -651,11 +651,11 @@ class OasisProfileGenerator:
                     logger.warning(f"LLM输出被截断 (attempt {attempt+1}), 尝试修复...")
                     content = self._fix_truncated_json(content)
                 
-                # 尝试解析JSON
+                # attemptparseJSON
                 try:
                     result = json.loads(content)
                     
-                    # 验证必需字段
+                    # validaterequiredfield
                     if "bio" not in result or not result["bio"]:
                         result["bio"] = entity_summary[:200] if entity_summary else f"{entity_type}: {entity_name}"
                     if "persona" not in result or not result["persona"]:
@@ -715,7 +715,7 @@ class OasisProfileGenerator:
         # 1. 首先尝试修复被截断的情况
         content = self._fix_truncated_json(content)
         
-        # 2. 尝试提取JSON部分
+        # 2. attemptextractJSONpart
         json_match = re.search(r'\{[\s\S]*\}', content)
         if json_match:
             json_str = json_match.group()
@@ -733,7 +733,7 @@ class OasisProfileGenerator:
             # 匹配JSON字符串值
             json_str = re.sub(r'"[^"\\]*(?:\\.[^"\\]*)*"', fix_string_newlines, json_str)
             
-            # 4. 尝试解析
+            # 4. attemptparse
             try:
                 result = json.loads(json_str)
                 result["_fixed"] = True
@@ -767,7 +767,7 @@ class OasisProfileGenerator:
                 "_fixed": True
             }
         
-        # 7. 完全失败，返回基础结构
+        # 7. fullyfailed, returnsbasestructure
         logger.warning(f"JSON修复失败，返回基础结构")
         return {
             "bio": entity_summary[:200] if entity_summary else f"{entity_type}: {entity_name}",
@@ -1017,7 +1017,7 @@ Rules:
             return result
     
     def set_graph_id(self, graph_id: str):
-        """设置图谱ID用于Zep检索"""
+        """setgraph IDused forZepretrieve"""
         self.graph_id = graph_id
     
     def generate_profiles_from_entities(
@@ -1048,7 +1048,7 @@ Rules:
         import concurrent.futures
         from threading import Lock
         
-        # 设置graph_id用于Zep检索
+        # setgraph_idused forZepretrieve
         if graph_id:
             self.graph_id = graph_id
         
@@ -1071,12 +1071,12 @@ Rules:
                 
                 try:
                     if output_platform == "reddit":
-                        # Reddit JSON 格式
+                        # Reddit JSON format
                         profiles_data = [p.to_reddit_format() for p in existing_profiles]
                         with open(realtime_output_path, 'w', encoding='utf-8') as f:
                             json.dump(profiles_data, f, ensure_ascii=False, indent=2)
                     else:
-                        # Twitter CSV 格式
+                        # Twitter CSV format
                         import csv
                         profiles_data = [p.to_twitter_format() for p in existing_profiles]
                         if profiles_data:
@@ -1110,7 +1110,7 @@ Rules:
                 
             except Exception as e:
                 logger.error(f"生成实体 {entity.name} 的人设失败: {str(e)}")
-                # 创建一个基础profile
+                # createabaseprofile
                 fallback_profile = OasisAgentProfile(
                     user_id=idx,
                     user_name=self._generate_username(entity.name),
@@ -1127,9 +1127,9 @@ Rules:
         print(f"开始生成Agent人设 - 共 {total} 个实体，并行数: {parallel_count}")
         print(f"{'='*60}\n")
         
-        # 使用线程池并行执行
+        # usethread poolparallelexecute
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_count) as executor:
-            # 提交所有任务
+            # commitalltask
             future_to_entity = {
                 executor.submit(generate_single_profile, idx, entity): (idx, entity)
                 for idx, entity in enumerate(entities)
@@ -1191,7 +1191,7 @@ Rules:
         """实时输出生成的人设到控制台（完整内容，不截断）"""
         separator = "-" * 70
         
-        # 构建完整输出内容（不截断）
+        # buildcompleteoutputcontent (no truncation) 
         topics_str = ', '.join(profile.interested_topics) if profile.interested_topics else '无'
         
         output_lines = [
@@ -1271,7 +1271,7 @@ Rules:
             
             # 写入数据行
             for idx, profile in enumerate(profiles):
-                # user_char: 完整人设（bio + persona），用于LLM系统提示
+                # user_char: completepersona (bio + persona) , used forLLMsystem prompt
                 user_char = profile.bio
                 if profile.persona and profile.persona != profile.bio:
                     user_char = f"{profile.bio} {profile.persona}"
@@ -1284,8 +1284,8 @@ Rules:
                 row = [
                     idx,                    # user_id: 从0开始的顺序ID
                     profile.name,           # name: 真实姓名
-                    profile.user_name,      # username: 用户名
-                    user_char,              # user_char: 完整人设（内部LLM使用）
+                    profile.user_name,      # username: username
+                    user_char,              # user_char: completepersona (internalLLMuse) 
                     description             # description: 简短简介（外部显示）
                 ]
                 writer.writerow(row)
@@ -1296,7 +1296,7 @@ Rules:
         """
         标准化gender字段为OASIS要求的英文格式
         
-        OASIS要求: male, female, other
+        OASISrequirement: male, female, other
         """
         if not gender:
             return "other"
@@ -1324,15 +1324,15 @@ Rules:
         使用与 to_reddit_format() 一致的格式，确保 OASIS 能正确读取。
         必须包含 user_id 字段，这是 OASIS agent_graph.get_agent() 匹配的关键！
         
-        必需字段：
+        requiredfield: 
         - user_id: 用户ID（整数，用于匹配 initial_posts 中的 poster_agent_id）
-        - username: 用户名
-        - name: 显示名称
+        - username: username
+        - name: showname
         - bio: 简介
-        - persona: 详细人设
+        - persona: detailedpersona
         - age: 年龄（整数）
-        - gender: "male", "female", 或 "other"
-        - mbti: MBTI类型
+        - gender: "male", "female", or "other"
+        - mbti: MBTItype
         - country: 国家
         """
         data = []

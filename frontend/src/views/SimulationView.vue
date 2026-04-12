@@ -48,7 +48,7 @@
         />
       </div>
 
-      <!-- Right Panel: Step2 环境搭建 -->
+      <!-- Right Panel: Step2 environment setup -->
       <div class="panel-wrapper right" :style="rightPanelStyle">
         <Step2EnvSetup
           :simulationId="currentSimulationId"
@@ -153,7 +153,7 @@ const handleGoBack = () => {
 const handleNextStep = (params = {}) => {
   addLog(t('log.enterStep3'))
 
-  // 记录模拟轮数配置
+  // recordsimulationround countconfig
   if (params.maxRounds) {
     addLog(t('log.customRoundsConfig', { rounds: params.maxRounds }))
   } else {
@@ -195,7 +195,7 @@ const checkAndStopRunningSimulation = async () => {
       try {
         const closeRes = await closeSimulationEnv({ 
           simulation_id: currentSimulationId.value,
-          timeout: 10  // 10秒超时
+          timeout: 10  // 10secondstimeout
         })
         
         if (closeRes.success) {
@@ -244,19 +244,19 @@ const loadSimulationData = async () => {
   try {
     addLog(t('log.loadingSimData', { id: currentSimulationId.value }))
 
-    // 获取 simulation 信息
+    // get simulation info
     const simRes = await getSimulation(currentSimulationId.value)
     if (simRes.success && simRes.data) {
       const simData = simRes.data
 
-      // 获取 project 信息
+      // get project info
       if (simData.project_id) {
         const projRes = await getProject(simData.project_id)
         if (projRes.success && projRes.data) {
           projectData.value = projRes.data
           addLog(t('log.projectLoadSuccess', { id: projRes.data.project_id }))
           
-          // 获取 graph 数据
+          // get graph data
           if (projRes.data.graph_id) {
             await loadGraph(projRes.data.graph_id)
           }
@@ -297,7 +297,7 @@ onMounted(async () => {
   // 检查并关闭正在运行的模拟（用户从 Step 3 返回时）
   await checkAndStopRunningSimulation()
   
-  // 加载模拟数据
+  // loadsimulation data
   loadSimulationData()
 })
 </script>
