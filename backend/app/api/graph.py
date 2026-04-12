@@ -586,6 +586,59 @@ def get_task(task_id: str):
     })
 
 
+@graph_bp.route('/quality/score', methods=['POST'])
+def score_document_quality():
+    """Phase 7.1: Score a document for ontology generation quality.
+
+    Accepts either:
+      - multipart/form-data with one or more files
+      - JSON { "text": "..." }
+    Returns a QualityScore dict. Pure — no state is persisted.
+    """
+    try:
+        from ..services.document_quality import score_document
+
+        if request.files:
+            uploaded = request.files.getlist('files')
+            texts = []
+            for f in uploaded:
+                if not f.filename:
+                    continue
+                # Save temporarily and parse
+                import tempfile
+                suffix = os.path.splitext(f.filename)[1] or '.txt'
+                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                    f.save(tmp.name)
+                    tmp_path = tmp.name
+                try:
+                    texts.append(FileParser.extract_text(tmp_path))
+                finally:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
+            combined = '\n\n'.join(texts)
+        else:
+            data = request.get_json(silent=True) or {}
+            combined = data.get('text', '')
+
+        if not combined:
+            return jsonify({
+                "success": False,
+                "error": "Provide either 'files' (multipart) or 'text' (JSON)."
+            }), 400
+
+        result = score_document(combined)
+        return jsonify({"success": True, "data": result.to_dict()})
+    except Exception as e:
+        logger.error(f"Quality scoring failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 @graph_bp.route('/task/<task_id>/cancel', methods=['POST'])
 def cancel_task_endpoint(task_id: str):
     """Phase 7: request cancellation of a running task (e.g., graph build).

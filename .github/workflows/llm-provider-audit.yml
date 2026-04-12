@@ -1,0 +1,92 @@
+name: LLM Provider Audit
+
+# Phase 7.7: weekly check for drift in docs/llm_providers.md
+# vs the defaults in setup.sh and .env.example.
+#
+# This job is a lightweight static check - it does not hit the
+# provider APIs (which would require secret management). It reports
+# issues as a check failure; manual resolution required when drift
+# is detected.
+#
+# Security note: this workflow does not consume any user-controlled
+# input (PR titles, commit messages, etc), so command injection is
+# not a concern here.
+
+on:
+  schedule:
+    # Every Monday at 09:00 UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'setup.sh'
+      - 'docs/llm_providers.md'
+      - 'docs/llm_budget_planning.md'
+      - '.env.example'
+      - 'backend/app/config.py'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check setup.sh references match llm_providers.md
+        run: |
+          set -e
+          echo "=== Static drift check ==="
+          missing=0
+
+          # Every provider claimed in llm_providers.md should have at least
+          # one corresponding default model in setup.sh or .env.example.
+          for provider in openrouter openai gemini groq deepseek anthropic grok qwen moonshot ollama; do
+            if grep -q "$provider" docs/llm_providers.md 2>/dev/null; then
+              if ! grep -qi "$provider" setup.sh && ! grep -qi "$provider" .env.example; then
+                echo "DRIFT: $provider is documented in llm_providers.md but not referenced in setup.sh or .env.example"
+                missing=$((missing+1))
+              fi
+            fi
+          done
+
+          if [ "$missing" -gt 0 ]; then
+            echo ""
+            echo "Found $missing provider(s) with doc drift. Run /llm-provider-tracker audit locally to refresh the catalogue."
+            exit 1
+          fi
+          echo "No static drift detected."
+
+      - name: Check for stale model names (known deprecated)
+        run: |
+          set -e
+          echo "=== Stale model check ==="
+          deprecated=(
+            "claude-sonnet-4-20250514"
+            "grok-3-mini"
+            "gemini-2.5-flash"
+            "gemma-4-31b-it:free"
+          )
+          found=0
+          for name in "${deprecated[@]}"; do
+            if grep -rq "$name" setup.sh .env.example 2>/dev/null; then
+              echo "STALE: $name is still referenced - should be updated"
+              found=$((found+1))
+            fi
+          done
+          if [ "$found" -gt 0 ]; then
+            exit 1
+          fi
+          echo "No stale model names detected."
+
+      - name: Validate JSON of all locale files
+        run: |
+          set -e
+          for f in locales/*.json; do
+            echo "Checking $f..."
+            python3 -c "import json, sys; json.load(open(sys.argv[1]))" "$f" || exit 1
+          done
+          echo "All locale files are valid JSON."

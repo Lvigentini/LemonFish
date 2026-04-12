@@ -267,24 +267,27 @@ The solution is a **subprocess-side monkey-patch**: wrap the two `generate_*_age
 
 ---
 
-## Phase 7 — Quality-of-Life Improvements (v0.9.0 partially shipped)
+## Phase 7 — Quality-of-Life Improvements (v0.9.2 — all items shipped)
 
-Backlog items that are self-contained and can be picked up anytime.
+Backlog items shipped across v0.9.0, v0.9.1, and v0.9.2.
 
 | # | Task | Source | Status |
 |---|------|--------|--------|
-| 7.1 | Document quality scoring before ontology generation | ontology guide | 📋 |
-| 7.2 | **Stop/cancel for graph build task** (TaskManager cancel events + `/task/<id>/cancel` endpoint + batch-boundary checks) | resilience audit | ✅ |
+| 7.1 | **Document quality scoring** before ontology generation (heuristic: entity density, relationship verbs, role words, quotes) | ontology guide | ✅ |
+| 7.2 | **Stop/cancel for graph build task** (TaskManager cancel events + `/task/<id>/cancel` + batch-boundary checks) | resilience audit | ✅ |
 | 7.3 | **Orphan project cleanup on ontology generation failure** | resilience audit | ✅ |
-| 7.4 | Simulation subprocess state reconciliation after server restart | resilience audit | 📋 |
-| 7.5 | `_wait_for_episodes` log Zep API errors | resilience audit | 📋 |
-| 7.6 | Structured input mode (CSV of stakeholders) | ontology guide | 📋 |
-| 7.7 | `/llm-provider-tracker audit` as GitHub Action | llm_providers.md | 📋 |
-| 7.8 | Cost warning for paid providers at high agent counts | budget planning | 📋 |
-| 7.9 | **Dry-run mode** (estimate without running) — via the pre-flight modal | budget planning | ✅ |
-| 7.10 | Per-step token budgets in `state.json` for partial resume | Phase 3 follow-up | 📋 |
+| 7.4 | **Simulation subprocess state reconciliation after server restart** (RunnerStatus.ORPHANED + PID liveness check via `os.kill(pid, 0)`) | resilience audit | ✅ |
+| 7.5 | **`_wait_for_episodes` logs Zep API errors** (per-episode error counting with smart log throttling at 1/3/10/20x) | resilience audit | ✅ |
+| 7.6 | **Structured input mode (CSV of stakeholders)** — FileParser now accepts .csv and renders rows as narrative paragraphs for the ontology generator | ontology guide | ✅ |
+| 7.7 | **`/llm-provider-tracker audit` as GitHub Action** (weekly drift check + stale model detection + JSON validation) | llm_providers.md | ✅ |
+| 7.8 | **Cost warning for paid providers at high agent counts** — tiered warning banner in pre-flight modal (medium/high/danger) | budget planning | ✅ |
+| 7.9 | **Dry-run mode** (estimate without running) — delivered via the pre-flight modal | budget planning | ✅ |
+| 7.10 | **Pool-wide budget tracker** — `GET /api/simulation/budget/daily` aggregates 24h consumption across all sims and compares to per-provider daily budgets | Phase 3 follow-up | ✅ |
 | 7.11 | **Frontend pre-flight modal** with estimate, cost tiers, provider pool | Phase 3 UX | ✅ |
 | 7.12 | **Frontend API client** for Phase 3/4/5/6 endpoints | Phase 3-6 UX | ✅ |
+| 7.13 | **Retry button for failed/cancelled graph builds** | v0.9.1 polish | ✅ |
+| 7.14 | **Batch-level progress display** (47/100 badges + batch bar) | v0.9.1 polish | ✅ |
+| 7.15 | **Pending upload persistence across page refresh** (localStorage metadata) | v0.9.1 polish | ✅ |
 
 ### Shipped in v0.9.0
 

@@ -92,3 +92,24 @@ export function resetProject(projectId) {
     method: 'post'
   })
 }
+
+/**
+ * Phase 7.1: score document quality BEFORE running ontology generation.
+ * Accepts either text (JSON body) or files (FormData).
+ * @param {String|FormData} input - text string or FormData with 'files'
+ */
+export function scoreDocumentQuality(input) {
+  if (input instanceof FormData) {
+    return service({
+      url: '/api/graph/quality/score',
+      method: 'post',
+      data: input,
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
+  return service({
+    url: '/api/graph/quality/score',
+    method: 'post',
+    data: { text: input }
+  })
+}

@@ -43,6 +43,7 @@ class RunnerStatus(str, Enum):
     STOPPED = "stopped"
     COMPLETED = "completed"
     FAILED = "failed"
+    ORPHANED = "orphaned"  # Phase 7.4: server restarted while sim was running
 
 
 @dataclass
@@ -232,12 +233,95 @@ class SimulationRunner:
         """获取运行状态"""
         if simulation_id in cls._run_states:
             return cls._run_states[simulation_id]
-        
+
         # 尝试从文件加载
         state = cls._load_run_state(simulation_id)
         if state:
+            # Phase 7.4: reconcile after server restart. If the persisted state
+            # says RUNNING/STARTING but we don't have the subprocess in memory,
+            # the server was restarted. Check if the PID is still alive.
+            if state.runner_status in (RunnerStatus.RUNNING, RunnerStatus.STARTING, RunnerStatus.PAUSED):
+                if simulation_id not in cls._processes:
+                    reconciled = cls._reconcile_after_restart(state)
+                    if reconciled is not None:
+                        state = reconciled
+                        cls._save_run_state(state)
             cls._run_states[simulation_id] = state
         return state
+
+    @classmethod
+    def _reconcile_after_restart(cls, state: SimulationRunState) -> Optional[SimulationRunState]:
+        """Phase 7.4: reconcile a persisted RUNNING state after server restart.
+
+        The Popen handle is gone but the persisted run_state.json still says
+        RUNNING with a process_pid. Three possible outcomes:
+
+        1. PID is alive AND belongs to a python process → orphaned
+           (subprocess still running but we can't control it via Popen)
+        2. PID is dead or belongs to something else → the subprocess died
+           during the restart → mark as FAILED with a reconciliation note
+        3. No PID recorded → can't tell; mark as FAILED to be safe
+        """
+        pid = state.process_pid
+        if not pid:
+            logger.warning(
+                f"Reconcile: sim {state.simulation_id} was {state.runner_status.value} "
+                f"but no PID recorded. Marking as FAILED."
+            )
+            state.runner_status = RunnerStatus.FAILED
+            state.error = "Server restarted while simulation was running; no PID to reconnect to."
+            state.completed_at = datetime.now().isoformat()
+            return state
+
+        # Check if PID is alive
+        alive = cls._is_pid_alive(pid)
+        if alive:
+            # Orphaned — we can't control it, but it may still be producing output
+            logger.warning(
+                f"Reconcile: sim {state.simulation_id} subprocess (PID {pid}) is still alive "
+                f"but detached. Marking as ORPHANED."
+            )
+            state.runner_status = RunnerStatus.ORPHANED
+            state.error = (
+                f"Server was restarted while simulation was running. Subprocess "
+                f"(PID {pid}) is still alive but can no longer be controlled. "
+                f"Check simulation.log for continued output, or kill the process "
+                f"manually and start a new run."
+            )
+            return state
+        else:
+            logger.warning(
+                f"Reconcile: sim {state.simulation_id} subprocess (PID {pid}) is dead. "
+                f"Marking as FAILED."
+            )
+            state.runner_status = RunnerStatus.FAILED
+            state.error = (
+                f"Simulation subprocess (PID {pid}) died while the server was restarted. "
+                f"Check simulation.log for the last recorded output."
+            )
+            state.completed_at = datetime.now().isoformat()
+            return state
+
+    @staticmethod
+    def _is_pid_alive(pid: int) -> bool:
+        """Check if a process with this PID is currently running.
+
+        On POSIX, os.kill(pid, 0) sends signal 0 which is a no-op but raises
+        if the process doesn't exist or we don't have permission. On Windows,
+        this signal is not supported so we fall back to OS-specific logic.
+        """
+        if pid <= 0:
+            return False
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            # Process exists but we don't own it — count as alive for safety
+            return True
+        except Exception:
+            return False
     
     @classmethod
     def _load_run_state(cls, simulation_id: str) -> Optional[SimulationRunState]:

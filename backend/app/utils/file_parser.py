@@ -62,22 +62,23 @@ def _read_text_with_fallback(file_path: str) -> str:
 
 class FileParser:
     """文件解析器"""
-    
-    SUPPORTED_EXTENSIONS = {'.pdf', '.md', '.markdown', '.txt'}
-    
+
+    # Phase 7.6: added .csv for structured stakeholder input
+    SUPPORTED_EXTENSIONS = {'.pdf', '.md', '.markdown', '.txt', '.csv'}
+
     @classmethod
     def extract_text(cls, file_path: str) -> str:
         """
         从文件中提取文本
-        
+
         Args:
             file_path: 文件路径
-            
+
         Returns:
             提取的文本内容
         """
         path = Path(file_path)
-        
+
         if not path.exists():
             raise FileNotFoundError(t('backend.fileNotFound', path=file_path))
 
@@ -85,14 +86,16 @@ class FileParser:
 
         if suffix not in cls.SUPPORTED_EXTENSIONS:
             raise ValueError(t('backend.unsupportedFormat', format=suffix))
-        
+
         if suffix == '.pdf':
             return cls._extract_from_pdf(file_path)
         elif suffix in {'.md', '.markdown'}:
             return cls._extract_from_md(file_path)
         elif suffix == '.txt':
             return cls._extract_from_txt(file_path)
-        
+        elif suffix == '.csv':
+            return cls._extract_from_csv(file_path)
+
         raise ValueError(t('backend.unprocessableFormat', format=suffix))
     
     @staticmethod
@@ -121,6 +124,89 @@ class FileParser:
     def _extract_from_txt(file_path: str) -> str:
         """从TXT提取文本，支持自动编码检测"""
         return _read_text_with_fallback(file_path)
+
+    @staticmethod
+    def _extract_from_csv(file_path: str) -> str:
+        """Phase 7.6: extract a CSV of stakeholders into narrative text.
+
+        The CSV is expected to have column headers that describe each row.
+        Each row is rendered as a structured paragraph so the ontology
+        generator sees named entities instead of a table.
+
+        Recognised columns (case-insensitive, any subset):
+            name, role, organization/organisation, description, position,
+            background, sentiment, stake
+
+        Unknown columns are appended as "key: value" pairs after the
+        main description. Rows with no recognisable name column are skipped.
+        """
+        import csv as _csv
+
+        raw_text = _read_text_with_fallback(file_path)
+        rows = []
+        # Try to sniff the delimiter
+        try:
+            dialect = _csv.Sniffer().sniff(raw_text[:2000], delimiters=',;\t|')
+        except _csv.Error:
+            dialect = _csv.excel
+        reader = _csv.DictReader(raw_text.splitlines(), dialect=dialect)
+
+        paragraphs = []
+        header_line = f"=== Stakeholder CSV: {Path(file_path).name} ==="
+        paragraphs.append(header_line)
+        paragraphs.append(
+            "The following is a structured list of stakeholders, "
+            "each representing a real-world actor who can interact on social media:"
+        )
+        paragraphs.append("")
+
+        # Build a name-key lookup from actual headers
+        name_keys = ('name', 'stakeholder', 'actor', 'entity', 'person', 'org', 'organization', 'organisation')
+        role_keys = ('role', 'title', 'position', 'profession')
+        desc_keys = ('description', 'background', 'bio', 'summary', 'about')
+        sentiment_keys = ('sentiment', 'stance', 'position_on', 'opinion')
+
+        for i, row in enumerate(reader, 1):
+            # Find the name
+            name = None
+            lower_row = {k.lower().strip(): v for k, v in row.items() if k}
+            for k in name_keys:
+                if k in lower_row and lower_row[k].strip():
+                    name = lower_row[k].strip()
+                    break
+            if not name:
+                continue
+
+            role = next((lower_row[k] for k in role_keys if k in lower_row and lower_row[k].strip()), None)
+            description = next((lower_row[k] for k in desc_keys if k in lower_row and lower_row[k].strip()), None)
+            sentiment = next((lower_row[k] for k in sentiment_keys if k in lower_row and lower_row[k].strip()), None)
+
+            # Build a narrative paragraph
+            parts = [f"Stakeholder {i}: **{name}**"]
+            if role:
+                parts.append(f"({role})")
+            parts.append('.')
+            if description:
+                parts.append(f" {description.strip()}")
+            if sentiment:
+                parts.append(f" Position/sentiment: {sentiment.strip()}.")
+
+            # Append any other non-empty columns we didn't already use
+            used = set(name_keys) | set(role_keys) | set(desc_keys) | set(sentiment_keys)
+            extras = []
+            for k, v in lower_row.items():
+                if k not in used and v and v.strip():
+                    extras.append(f"{k}={v.strip()}")
+            if extras:
+                parts.append(f" ({', '.join(extras)})")
+
+            paragraphs.append(''.join(parts))
+
+        if len(paragraphs) <= 3:
+            # No recognisable rows — fall back to raw text
+            return raw_text
+
+        return '\n\n'.join(paragraphs)
     
     @classmethod
     def extract_from_multiple(cls, file_paths: List[str]) -> str:

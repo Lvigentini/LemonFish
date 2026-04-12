@@ -70,6 +70,16 @@
         <!-- Cost estimates -->
         <section v-if="estimate" class="section">
           <h3>{{ $t('preflight.cost') || 'Approximate cost' }}</h3>
+
+          <!-- Phase 7.8: warning banner when cost is high -->
+          <div v-if="costWarningTier" class="cost-warning" :class="costWarningLevel">
+            <span class="warning-icon">⚠</span>
+            <div class="warning-body">
+              <strong>{{ costWarningTitle }}</strong>
+              <span class="warning-hint">{{ costWarningMessage }}</span>
+            </div>
+          </div>
+
           <div class="cost-grid">
             <div v-for="(cost, tier) in estimate.total.approx_cost_usd" :key="tier" class="cost-pill" :class="tierClass(tier)">
               <span class="cost-tier">{{ formatTier(tier) }}</span>
@@ -105,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { estimateTokens, getProviderPool } from '../api/simulation'
 
 const props = defineProps({
@@ -197,6 +207,46 @@ function stepPercent(tokens) {
   if (!estimate.value?.total?.tokens) return 0
   return Math.max(0.5, (tokens / estimate.value.total.tokens) * 100)
 }
+
+// Phase 7.8: warn when the simulation would be expensive on paid providers
+const costWarningTier = computed(() => {
+  if (!estimate.value) return null
+  const costs = estimate.value.total.approx_cost_usd
+  // Warn if premium Claude > $5 or total tokens > 10M (high agent/round combo)
+  if (costs.premium_claude_sonnet > 5) return 'high'
+  if (estimate.value.total.tokens > 10_000_000) return 'very-high'
+  if (costs.cheap_deepseek_chat > 2) return 'medium'
+  return null
+})
+
+const costWarningLevel = computed(() => {
+  const tier = costWarningTier.value
+  if (tier === 'very-high') return 'warn-danger'
+  if (tier === 'high') return 'warn-high'
+  return 'warn-medium'
+})
+
+const costWarningTitle = computed(() => {
+  if (costWarningTier.value === 'very-high') {
+    return 'Very large simulation'
+  }
+  if (costWarningTier.value === 'high') {
+    return 'High-cost scenario on premium models'
+  }
+  return 'Moderate cost on paid providers'
+})
+
+const costWarningMessage = computed(() => {
+  if (!estimate.value) return ''
+  const costs = estimate.value.total.approx_cost_usd
+  if (costWarningTier.value === 'very-high') {
+    return `${formatTokens(estimate.value.total.tokens)} tokens is a very large run. Consider reducing agent count or rounds before proceeding. Free tiers will be exhausted quickly.`
+  }
+  if (costWarningTier.value === 'high') {
+    return `Claude Sonnet would cost ~$${costs.premium_claude_sonnet.toFixed(2)}. Consider a cheaper provider (Groq, DeepSeek, Gemini Flash) or reduce the scenario size.`
+  }
+  return `DeepSeek would cost ~$${costs.cheap_deepseek_chat.toFixed(2)}. Free tier on Groq or Gemini would be $0.`
+})
 </script>
 
 <style scoped>
@@ -330,6 +380,45 @@ function stepPercent(tokens) {
   color: #bbb;
   border-radius: 0 4px 4px 0;
 }
+
+/* Phase 7.8: cost warning banner */
+.cost-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  border: 1px solid;
+}
+.cost-warning.warn-medium {
+  background: rgba(218, 165, 32, 0.08);
+  border-color: rgba(218, 165, 32, 0.4);
+}
+.cost-warning.warn-high {
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.5);
+}
+.cost-warning.warn-danger {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.5);
+}
+.warning-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.cost-warning.warn-medium .warning-icon { color: #DAA520; }
+.cost-warning.warn-high .warning-icon { color: #facc15; }
+.cost-warning.warn-danger .warning-icon { color: #f87171; }
+.warning-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+.warning-body strong { color: #fff; }
+.warning-hint { color: #bbb; line-height: 1.4; }
 
 .cost-grid {
   display: grid;

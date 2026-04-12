@@ -2889,6 +2889,21 @@ def probe_capability():
         }), 500
 
 
+@simulation_bp.route('/budget/daily', methods=['GET'])
+def get_daily_budget():
+    """Phase 7.10: aggregated 24h token consumption vs configured daily budgets."""
+    try:
+        from ..services.budget_tracker import get_daily_totals
+        return jsonify({"success": True, "data": get_daily_totals()})
+    except Exception as e:
+        logger.error(f"Daily budget aggregation failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 @simulation_bp.route('/providers/capabilities/clear', methods=['POST'])
 def clear_capabilities():
     """Clear the capability cache. Next call will re-probe."""

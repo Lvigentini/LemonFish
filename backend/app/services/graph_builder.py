@@ -430,19 +430,32 @@ class GraphBuilderService:
                     )
                 break
             
-            # 检查每个 episode 的处理状态
+            # Phase 7.5: log per-episode errors instead of silently swallowing them.
+            # A per-episode error is still non-fatal (we retry on next tick) but
+            # repeated errors for the same episode indicate Zep trouble — track and log.
+            if not hasattr(self, '_episode_error_counts'):
+                self._episode_error_counts = {}
+
             for ep_uuid in list(pending_episodes):
                 try:
                     episode = self.client.graph.episode.get(uuid_=ep_uuid)
                     is_processed = getattr(episode, 'processed', False)
-                    
+
                     if is_processed:
                         pending_episodes.remove(ep_uuid)
                         completed_count += 1
-                        
+                        # Clear error count on success
+                        self._episode_error_counts.pop(ep_uuid, None)
+
                 except Exception as e:
-                    # 忽略单个查询错误，继续
-                    pass
+                    # Count errors per episode — log on first, third, tenth occurrence to avoid spam
+                    n = self._episode_error_counts.get(ep_uuid, 0) + 1
+                    self._episode_error_counts[ep_uuid] = n
+                    if n == 1 or n == 3 or n == 10 or n % 20 == 0:
+                        logger.warning(
+                            f"Zep episode {ep_uuid[:8]}... query failed (attempt {n}): "
+                            f"{type(e).__name__}: {str(e)[:200]}"
+                        )
             
             elapsed = int(time.time() - start_time)
             if progress_callback:
@@ -454,9 +467,20 @@ class GraphBuilderService:
             if pending_episodes:
                 time.sleep(3)  # 每3秒检查一次
         
+        # Phase 7.5: summarise persistent per-episode errors
+        if hasattr(self, '_episode_error_counts') and self._episode_error_counts:
+            persistent = {k: v for k, v in self._episode_error_counts.items() if v >= 3}
+            if persistent:
+                logger.warning(
+                    f"Zep episode polling finished with {len(persistent)} episodes "
+                    f"having persistent errors (>=3 failed queries each). "
+                    f"Completed: {completed_count}/{total_episodes}."
+                )
+            self._episode_error_counts.clear()
+
         if progress_callback:
             progress_callback(t('progress.processingComplete', completed=completed_count, total=total_episodes), 1.0)
-    
+
     def _get_graph_info(self, graph_id: str) -> GraphInfo:
         """获取图谱信息"""
         # 获取节点（分页）
