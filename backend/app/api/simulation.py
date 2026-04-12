@@ -2789,3 +2789,100 @@ def get_token_usage(simulation_id: str):
             "success": False,
             "error": str(e)
         }), 500
+
+
+# ============== Phase 4: Multi-Provider Pool API ==============
+
+@simulation_bp.route('/providers/pool', methods=['GET'])
+def get_providers_pool():
+    """Return the currently configured multi-provider pool (no probing)."""
+    try:
+        from ..services.provider_pool import get_pool_summary
+        return jsonify({"success": True, "data": get_pool_summary()})
+    except Exception as e:
+        logger.error(f"Failed to get provider pool: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@simulation_bp.route('/providers/probe', methods=['POST'])
+def probe_providers():
+    """Probe every provider in the pool and return health results.
+
+    Each provider is pinged with a small chat completion (~10 tokens).
+    """
+    try:
+        from ..services.provider_pool import ProviderPool
+        pool = ProviderPool()
+        if not pool:
+            return jsonify({
+                "success": False,
+                "error": "Multi-provider pool not configured. Set LLM_PROVIDERS in .env."
+            }), 400
+        results = pool.probe_all()
+        reachable_count = sum(1 for h in results if h.reachable)
+        return jsonify({
+            "success": True,
+            "data": {
+                "pool_size": len(pool),
+                "reachable_count": reachable_count,
+                "results": [h.to_dict() for h in results],
+            }
+        })
+    except Exception as e:
+        logger.error(f"Provider probe failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@simulation_bp.route('/providers/allocate', methods=['POST'])
+def allocate_providers():
+    """Preview how agents would be randomly allocated across the pool.
+
+    Request JSON:
+        agent_count: int (required)
+        seed: int (optional, for reproducibility)
+        only_reachable: bool (optional, default False — set True to probe first)
+    """
+    try:
+        from ..services.provider_pool import ProviderPool
+        data = request.get_json() or {}
+        agent_count = int(data.get('agent_count', 0))
+        seed = data.get('seed')
+        only_reachable = bool(data.get('only_reachable', False))
+
+        if agent_count <= 0:
+            return jsonify({"success": False, "error": "agent_count must be positive"}), 400
+
+        pool = ProviderPool()
+        if not pool:
+            return jsonify({
+                "success": False,
+                "error": "Multi-provider pool not configured"
+            }), 400
+
+        agent_ids = list(range(agent_count))
+        assignments = pool.allocate_agents(agent_ids, seed=seed, only_reachable=only_reachable)
+
+        # Summary: how many agents per provider
+        from collections import Counter
+        distribution = Counter(assignments.values())
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "agent_count": agent_count,
+                "seed": seed,
+                "only_reachable": only_reachable,
+                "distribution": dict(distribution),
+                "assignments": assignments,
+            }
+        })
+    except Exception as e:
+        logger.error(f"Allocation preview failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

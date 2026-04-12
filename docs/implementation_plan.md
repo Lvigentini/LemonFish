@@ -147,44 +147,45 @@ LLM_REPORT_*       # Step 5 — reasoning-capable
 
 ---
 
-## Phase 4 — Multi-Provider Token Budget Allocator (v0.6.0 target)
+## Phase 4 — Multi-Provider Token Budget Allocator (v0.6.0) 🚧 FOUNDATION SHIPPED
 
 **Goal:** Automatically distribute agent LLM calls across multiple free-tier providers to stretch daily budgets. Depends on Phase 3 (tracking) and Phase 2 (per-step routing).
 
-### Design
-
-See [`docs/llm_budget_planning.md#proposed-multi-provider-token-allocator`](./llm_budget_planning.md) for the full design.
-
-Key properties:
-- **Random agent-to-provider assignment** (not role-based — see [new_features_planning.md](./new_features_planning.md))
-- **Agent locks to assigned provider for the whole simulation** (no fallback = identity preserved)
-- **Skip-turn on exhaustion** — if a provider is rate-limited, its agents go silent rather than route elsewhere
-- **Runtime monitoring** — track consumption per provider; show live in UI
+**Status:** The foundation (config, pool, probe, allocator, API surface) is shipped in v0.6.0. The final piece — **per-agent runtime routing in the OASIS simulation step** — is blocked on upstream camel-oasis work and will ship in Phase 6 alongside the multi-model persona feature.
 
 ### Tasks
 
-| # | Task | Priority |
-|---|------|----------|
-| 4.1 | Multi-provider config schema (`LLM_PROVIDERS=groq,google,ollama` plus per-provider blocks) | High |
-| 4.2 | Pre-simulation probe: ping each provider, measure latency, read rate-limit headers | High |
-| 4.3 | Allocator: map agents to providers proportional to available budget | High |
-| 4.4 | Store assignment in agent profile JSON (reproducible via seed) | Medium |
-| 4.5 | Per-provider rate limit tracking at runtime | High |
-| 4.6 | Skip-turn logic in simulation loop when assigned provider unavailable | High |
-| 4.7 | Live monitor UI (consumption per provider, per agent) | Low |
-| 4.8 | Post-simulation report: which agents used which model, any skip events | Medium |
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 4.1 | Multi-provider config schema (`LLM_PROVIDERS=groq,google,ollama` plus per-provider blocks) | ✅ | `Config.get_provider_pool()` parses env vars with `LLM_<NAME>_*` convention |
+| 4.2 | `ProviderPool` service with entry parsing | ✅ | `backend/app/services/provider_pool.py` |
+| 4.3 | Pre-flight probe (ping each provider with 5-token sample call) | ✅ | `pool.probe_all()` returns latency, reachability, sample usage |
+| 4.4 | Random seeded agent-to-provider allocation | ✅ | `pool.allocate_agents(ids, seed=...)` — reproducible |
+| 4.5 | API endpoints | ✅ | `GET /api/simulation/providers/pool`, `POST /api/simulation/providers/probe`, `POST /api/simulation/providers/allocate` |
+| 4.6 | `.env.example` multi-provider section | ✅ | Documented with Groq + Google + Ollama sample |
+| 4.7 | **Per-agent runtime routing in OASIS subprocess** | 📋 | **Blocked on OASIS integration — see design note below** |
+| 4.8 | Store allocation in agent profile JSON so simulation can read it | 📋 | Phase 6 |
+| 4.9 | Skip-turn logic when assigned provider hits rate limit | 📋 | Phase 6 |
+| 4.10 | Live monitor UI | 📋 | Future QoL |
 
-### Dependencies
+### Design Notes
 
-- Phase 2 (step routing) — proves per-call provider selection works
-- Phase 3 (token tracking) — needed to measure consumption
+**Why the OASIS piece is deferred:** OASIS's `generate_reddit_agent_graph()` takes a **single model instance** that is shared by every agent. Per-agent model assignment requires either:
+1. Forking camel-oasis to accept a per-agent model map (rejected in "Not Doing")
+2. Running multiple OASIS environments in parallel, one per provider, and coordinating state (significant rewrite)
+3. Monkey-patching camel-oasis at subprocess startup to intercept agent action calls and route them dynamically (fragile)
 
-### Acceptance
+This is a research question for Phase 6. The infrastructure shipped in Phase 4 (pool, probe, allocator, tracking) makes the eventual wire-up straightforward — we just need to decide *how* to plumb per-agent models through OASIS.
 
-- A simulation running on 3 providers (Groq + Google + Ollama) completes successfully
-- Assignment is reproducible given a seed
-- If Groq hits rate limit mid-sim, Groq-assigned agents skip; Google/Ollama agents continue
-- Post-sim report shows per-provider token consumption
+**What Phase 4 does deliver right now:** Users can probe multiple providers, preview allocations, and track usage per provider. Services that use `LLMClient` directly (ontology, profiles, config, report — Steps 1, 2, 3, 5) can already be pointed at different providers via the Phase 2 per-step overrides. Only the simulation step (Step 4) is locked to a single provider until Phase 6.
+
+### Acceptance (for the shipped foundation)
+
+- ✅ `GET /api/simulation/providers/pool` returns configured pool (or empty state)
+- ✅ `POST /api/simulation/providers/probe` pings every provider and reports health
+- ✅ `POST /api/simulation/providers/allocate` returns reproducible random assignment given a seed
+- ✅ Allocation is seed-deterministic (same seed → same assignment)
+- 📋 OASIS subprocess per-agent routing — deferred to Phase 6
 
 ---
 
@@ -295,8 +296,8 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
 | v0.2.0 | Phase 0 | ✅ |
 | v0.3.0 | Phase 1 (catalogue sync) | ✅ |
 | v0.4.0 | Phase 2 (step routing) | ✅ |
-| v0.5.0 (current) | Phase 3 (token tracking) | ✅ |
-| v0.6.0 | Phase 4 (budget allocator) | 📋 |
+| v0.5.0 | Phase 3 (token tracking) | ✅ |
+| v0.6.0 (current) | Phase 4 (multi-provider pool foundation) | 🚧 shipped without OASIS routing |
 | v0.7.0 | Phase 5 (capability detection) | 📋 |
 | v0.8.0 | Phase 6 (multi-model personas) | 📋 |
 | v1.0.0 | Full feature set, stable API | 💡 |

@@ -85,6 +85,47 @@ class Config:
     LLM_FALLBACK_MODELS = [
         m.strip() for m in os.environ.get('LLM_FALLBACK_MODELS', '').split(',') if m.strip()
     ]
+
+    # -------------------- Phase 4: Multi-Provider Pool --------------------
+    # Enables spreading LLM load across multiple free-tier providers.
+    # Set LLM_PROVIDERS=groq,google,ollama then add per-provider blocks:
+    #   LLM_GROQ_API_KEY, LLM_GROQ_BASE_URL, LLM_GROQ_MODEL
+    #   LLM_GROQ_DAILY_TOKEN_BUDGET (optional, informational)
+    # Each provider name is uppercased and looked up at runtime.
+    # If unset, the app uses the single LLM_* config above.
+    LLM_PROVIDERS = [
+        p.strip().lower() for p in os.environ.get('LLM_PROVIDERS', '').split(',') if p.strip()
+    ]
+
+    @classmethod
+    def get_provider_pool(cls) -> list:
+        """Return list of configured multi-provider entries.
+
+        Each entry is a dict with: name, api_key, base_url, model, daily_token_budget (optional).
+        Returns empty list if LLM_PROVIDERS is not set.
+        """
+        pool = []
+        for name in cls.LLM_PROVIDERS:
+            prefix = f'LLM_{name.upper()}_'
+            api_key = os.environ.get(prefix + 'API_KEY')
+            base_url = os.environ.get(prefix + 'BASE_URL')
+            model = os.environ.get(prefix + 'MODEL')
+            if not (api_key and base_url and model):
+                # Incomplete provider block — skip with a warning
+                continue
+            budget_raw = os.environ.get(prefix + 'DAILY_TOKEN_BUDGET', '')
+            try:
+                daily_budget = int(budget_raw) if budget_raw else None
+            except ValueError:
+                daily_budget = None
+            pool.append({
+                'name': name,
+                'api_key': api_key,
+                'base_url': base_url,
+                'model': model,
+                'daily_token_budget': daily_budget,
+            })
+        return pool
     
     # Zep配置
     ZEP_API_KEY = os.environ.get('ZEP_API_KEY')
