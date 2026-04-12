@@ -186,13 +186,17 @@ class OasisProfileGenerator:
         zep_api_key: Optional[str] = None,
         graph_id: Optional[str] = None
     ):
-        self.api_key = api_key or Config.LLM_API_KEY
-        self.base_url = base_url or Config.LLM_BASE_URL
-        self.model_name = model_name or Config.LLM_MODEL_NAME
-        
+        # Resolve step-specific config (LLM_PROFILES_*) with fallback to primary LLM_*
+        step_cfg = Config.get_step_llm_config('profiles')
+        self.api_key = api_key or step_cfg['api_key']
+        self.base_url = base_url or step_cfg['base_url']
+        self.model_name = model_name or step_cfg['model']
+
         if not self.api_key:
-            raise ValueError("LLM_API_KEY 未配置")
-        
+            from ..utils.locale import t
+            raise ValueError(t('backend.llmApiKeyMissing'))
+
+        logger.info(f"Profiles step using model: {self.model_name} via {self.base_url}")
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url

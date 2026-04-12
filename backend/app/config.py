@@ -32,11 +32,52 @@ class Config:
     LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
     LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-4o-mini')
 
-    # Per-step LLM overrides (ontology benefits from large-context models)
+    # Per-step LLM overrides — each step can optionally use a different provider/model.
+    # If not set, the step falls back to the primary LLM_* config above.
+    # See docs/implementation_plan.md Phase 2 for rationale.
+
+    # Step 1 — Ontology generation (benefits from large-context models like Gemini)
     LLM_ONTOLOGY_API_KEY = os.environ.get('LLM_ONTOLOGY_API_KEY')
     LLM_ONTOLOGY_BASE_URL = os.environ.get('LLM_ONTOLOGY_BASE_URL')
     LLM_ONTOLOGY_MODEL = os.environ.get('LLM_ONTOLOGY_MODEL')
     LLM_ONTOLOGY_MAX_TEXT_LENGTH = int(os.environ.get('LLM_ONTOLOGY_MAX_TEXT_LENGTH', '0')) or None
+
+    # Step 2 — Agent persona generation (N parallel calls, benefits from cheap/fast JSON-capable models)
+    LLM_PROFILES_API_KEY = os.environ.get('LLM_PROFILES_API_KEY')
+    LLM_PROFILES_BASE_URL = os.environ.get('LLM_PROFILES_BASE_URL')
+    LLM_PROFILES_MODEL = os.environ.get('LLM_PROFILES_MODEL')
+
+    # Step 3 — Simulation config generation (small context, JSON output)
+    LLM_CONFIG_API_KEY = os.environ.get('LLM_CONFIG_API_KEY')
+    LLM_CONFIG_BASE_URL = os.environ.get('LLM_CONFIG_BASE_URL')
+    LLM_CONFIG_MODEL = os.environ.get('LLM_CONFIG_MODEL')
+
+    # Step 4 — Simulation (~90% of total tokens; must be free or near-free)
+    # Passed through to the OASIS subprocess via environment variables.
+    LLM_SIMULATION_API_KEY = os.environ.get('LLM_SIMULATION_API_KEY')
+    LLM_SIMULATION_BASE_URL = os.environ.get('LLM_SIMULATION_BASE_URL')
+    LLM_SIMULATION_MODEL = os.environ.get('LLM_SIMULATION_MODEL')
+
+    # Step 5 — Report generation (ReACT loop, benefits from reasoning-capable models)
+    LLM_REPORT_API_KEY = os.environ.get('LLM_REPORT_API_KEY')
+    LLM_REPORT_BASE_URL = os.environ.get('LLM_REPORT_BASE_URL')
+    LLM_REPORT_MODEL = os.environ.get('LLM_REPORT_MODEL')
+
+    @classmethod
+    def get_step_llm_config(cls, step: str) -> dict:
+        """Return api_key/base_url/model for a pipeline step, falling back to primary LLM_* if any are unset.
+
+        Args:
+            step: one of 'ontology', 'profiles', 'config', 'simulation', 'report'
+
+        Returns:
+            dict with keys 'api_key', 'base_url', 'model'
+        """
+        step_upper = step.upper()
+        api_key = os.environ.get(f'LLM_{step_upper}_API_KEY') or cls.LLM_API_KEY
+        base_url = os.environ.get(f'LLM_{step_upper}_BASE_URL') or cls.LLM_BASE_URL
+        model = os.environ.get(f'LLM_{step_upper}_MODEL') or cls.LLM_MODEL_NAME
+        return {'api_key': api_key, 'base_url': base_url, 'model': model}
 
     # LLM resilience settings
     LLM_MAX_RETRIES = int(os.environ.get('LLM_MAX_RETRIES', '3'))

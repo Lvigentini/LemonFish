@@ -903,7 +903,13 @@ class ReportAgent:
         self.simulation_id = simulation_id
         self.simulation_requirement = simulation_requirement
         
-        self.llm = llm_client or LLMClient()
+        if llm_client:
+            self.llm = llm_client
+        else:
+            from ..config import Config
+            step_cfg = Config.get_step_llm_config('report')
+            logger.info(f"Report step using model: {step_cfg['model']} via {step_cfg['base_url']}")
+            self.llm = LLMClient(**step_cfg)
         self.zep_tools = zep_tools or ZepToolsService()
         
         # 工具定义

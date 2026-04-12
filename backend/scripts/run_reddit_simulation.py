@@ -440,10 +440,16 @@ class RedditSimulationRunner:
         - LLM_BASE_URL: API基础URL
         - LLM_MODEL_NAME: 模型名称
         """
-        # 优先从 .env 读取配置
-        llm_api_key = os.environ.get("LLM_API_KEY", "")
-        llm_base_url = os.environ.get("LLM_BASE_URL", "")
-        llm_model = os.environ.get("LLM_MODEL_NAME", "")
+        # Prefer LLM_SIMULATION_* override, fall back to primary LLM_*
+        sim_api_key = os.environ.get("LLM_SIMULATION_API_KEY", "")
+        if sim_api_key:
+            llm_api_key = sim_api_key
+            llm_base_url = os.environ.get("LLM_SIMULATION_BASE_URL", "")
+            llm_model = os.environ.get("LLM_SIMULATION_MODEL", "")
+        else:
+            llm_api_key = os.environ.get("LLM_API_KEY", "")
+            llm_base_url = os.environ.get("LLM_BASE_URL", "")
+            llm_model = os.environ.get("LLM_MODEL_NAME", "")
         
         # 如果 .env 中没有，则使用 config 作为备用
         if not llm_model:

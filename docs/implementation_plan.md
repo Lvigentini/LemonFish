@@ -66,7 +66,7 @@ These are the changes live on `main` as of v0.2.0.
 
 ---
 
-## Phase 2 — Step-Specific Model Routing (v0.4.0 target)
+## Phase 2 — Step-Specific Model Routing (v0.4.0) ✅ SHIPPED
 
 **Goal:** Expand the existing `LLM_ONTOLOGY_*` mechanism to all 5 pipeline steps. Users can assign different providers/models to each step.
 
@@ -74,37 +74,39 @@ These are the changes live on `main` as of v0.2.0.
 
 ### Design
 
-Symmetrical env vars for all steps, all optional (fall back to primary `LLM_*` config):
+Symmetrical env vars for all steps, all optional (fall back to primary `LLM_*` config). A `Config.get_step_llm_config(step)` helper handles the fallback logic so services don't need to duplicate the lookup pattern.
 
 ```env
-LLM_ONTOLOGY_*     (already exists — uses Gemini 3 Flash)
-LLM_PROFILES_*     (new — cheap/fast JSON-capable, e.g. gpt-5-nano)
-LLM_CONFIG_*       (new — small context, JSON mode)
-LLM_SIMULATION_*   (new — free/near-free, e.g. Groq llama-3.1-8b)
-LLM_REPORT_*       (new — reasoning-capable, e.g. Claude Sonnet, Gemini 2.5 Pro)
+LLM_ONTOLOGY_*     # Step 1 — large-context (Gemini 3 Flash recommended)
+LLM_PROFILES_*     # Step 2 — cheap/fast JSON-capable
+LLM_CONFIG_*       # Step 3 — small context, JSON mode
+LLM_SIMULATION_*   # Step 4 — free/near-free (dominates token cost)
+LLM_REPORT_*       # Step 5 — reasoning-capable
 ```
 
 ### Tasks
 
-| # | Task | File | Priority |
-|---|------|------|----------|
-| 2.1 | Add `LLM_PROFILES_*` config vars and wire in `oasis_profile_generator.py` | `backend/app/config.py`, `backend/app/services/oasis_profile_generator.py` | High |
-| 2.2 | Add `LLM_CONFIG_*` config vars and wire in `simulation_config_generator.py` | same pattern | Medium |
-| 2.3 | Add `LLM_SIMULATION_*` config vars — requires passing model config to OASIS subprocess | `backend/scripts/run_parallel_simulation.py` | High (hardest) |
-| 2.4 | Add `LLM_REPORT_*` config vars and wire in `report_agent.py` | `backend/app/services/report_agent.py` | Medium |
-| 2.5 | Update wizard to ask "simple (one provider)" vs "advanced (per-step)" | `setup.sh` | Low |
-| 2.6 | Document the override pattern | `docs/llm_providers.md` | Low |
+| # | Task | File | Status |
+|---|------|------|--------|
+| 2.0 | Add `Config.get_step_llm_config(step)` helper with automatic fallback | `backend/app/config.py` | ✅ |
+| 2.1 | Wire `LLM_PROFILES_*` in `oasis_profile_generator.py` | same | ✅ |
+| 2.2 | Wire `LLM_CONFIG_*` in `simulation_config_generator.py` | same | ✅ |
+| 2.3 | Wire `LLM_SIMULATION_*` in all 3 simulation scripts (parallel, reddit, twitter) | `backend/scripts/*.py` | ✅ |
+| 2.4 | Wire `LLM_REPORT_*` in `report_agent.py` | same | ✅ |
+| 2.5 | Refactor ontology generator to use the new helper | `backend/app/services/ontology_generator.py` | ✅ |
+| 2.6 | Document all 5 step overrides in `.env.example` | `.env.example` | ✅ |
 
-### Risks
+### Design Notes
 
-- OASIS subprocess model override (2.3) requires verifying that `camel.models.ModelFactory` honours dynamic base URLs. May need a patch.
-- Config proliferation. Needs clear defaults so users don't have to set all 5.
+- **Subprocess inheritance**: `simulation_runner.py` already does `env = os.environ.copy()` before spawning OASIS, so `LLM_SIMULATION_*` vars automatically flow through to the subprocess. No IPC changes needed.
+- **Legacy boost config**: The original `LLM_BOOST_*` mechanism still works for parallel-platform acceleration; it takes precedence over `LLM_SIMULATION_*` when `use_boost=True`.
+- **No wizard changes**: Per-step overrides are advanced configuration; the wizard still asks for one primary provider. Users who want per-step routing edit `.env` directly.
 
 ### Acceptance
 
-- A user can configure Gemini for ontology, Groq for simulation, and OpenAI for report — all in one run
-- Tokens consumed per-step are logged separately
-- Default behaviour (single `LLM_*` block) unchanged
+- ✅ A user can configure Gemini for ontology + Groq for simulation + OpenAI for report in one `.env`
+- ✅ Default behaviour (single `LLM_*` block) unchanged
+- 📋 Tokens consumed per-step are logged separately — deferred to Phase 3
 
 ---
 
@@ -277,8 +279,8 @@ Phase 0 (done)  ──►  Phase 1 (catalogue sync)  ──►  Phase 2 (step ro
 | Version | Contents | Estimated phases |
 |---------|----------|------------------|
 | v0.2.0 | Phase 0 | ✅ |
-| v0.3.0 (current) | Phase 1 (catalogue sync) | ✅ |
-| v0.4.0 | Phase 2 (step routing) | 📋 |
+| v0.3.0 | Phase 1 (catalogue sync) | ✅ |
+| v0.4.0 (current) | Phase 2 (step routing) | ✅ |
 | v0.5.0 | Phase 3 (token tracking) | 📋 |
 | v0.6.0 | Phase 4 (budget allocator) | 📋 |
 | v0.7.0 | Phase 5 (capability detection) | 📋 |

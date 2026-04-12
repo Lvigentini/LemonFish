@@ -995,25 +995,35 @@ def create_model(config: Dict[str, Any], use_boost: bool = False):
         config: 模拟配置字典
         use_boost: 是否使用加速 LLM 配置（如果可用）
     """
-    # 检查是否有加速配置
+    # Resolution order for simulation LLM:
+    #   1. If use_boost and LLM_BOOST_* present -> boost config
+    #   2. If LLM_SIMULATION_* present -> simulation-specific override
+    #   3. Else fall back to primary LLM_* config
     boost_api_key = os.environ.get("LLM_BOOST_API_KEY", "")
     boost_base_url = os.environ.get("LLM_BOOST_BASE_URL", "")
     boost_model = os.environ.get("LLM_BOOST_MODEL_NAME", "")
     has_boost_config = bool(boost_api_key)
-    
-    # 根据参数和配置情况选择使用哪个 LLM
+
+    sim_api_key = os.environ.get("LLM_SIMULATION_API_KEY", "")
+    sim_base_url = os.environ.get("LLM_SIMULATION_BASE_URL", "")
+    sim_model = os.environ.get("LLM_SIMULATION_MODEL", "")
+    has_simulation_override = bool(sim_api_key)
+
     if use_boost and has_boost_config:
-        # 使用加速配置
         llm_api_key = boost_api_key
         llm_base_url = boost_base_url
         llm_model = boost_model or os.environ.get("LLM_MODEL_NAME", "")
-        config_label = "[加速LLM]"
+        config_label = "[boost LLM]"
+    elif has_simulation_override:
+        llm_api_key = sim_api_key
+        llm_base_url = sim_base_url
+        llm_model = sim_model or os.environ.get("LLM_MODEL_NAME", "")
+        config_label = "[simulation-override LLM]"
     else:
-        # 使用通用配置
         llm_api_key = os.environ.get("LLM_API_KEY", "")
         llm_base_url = os.environ.get("LLM_BASE_URL", "")
         llm_model = os.environ.get("LLM_MODEL_NAME", "")
-        config_label = "[通用LLM]"
+        config_label = "[primary LLM]"
     
     # 如果 .env 中没有模型名，则使用 config 作为备用
     if not llm_model:
