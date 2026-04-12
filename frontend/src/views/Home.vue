@@ -191,7 +191,7 @@
 
             <!-- 启动按钮 -->
             <div class="console-section btn-section">
-              <button 
+              <button
                 class="start-engine-btn"
                 @click="startSimulation"
                 :disabled="!canSubmit || loading"
@@ -199,6 +199,13 @@
                 <span v-if="!loading">{{ $t('home.startEngine') }}</span>
                 <span v-else>{{ $t('home.initializing') }}</span>
                 <span class="btn-arrow">→</span>
+              </button>
+              <button
+                class="research-link-btn"
+                type="button"
+                @click="goToResearch"
+              >
+                {{ $t('home.startWithResearch') }} <span class="btn-arrow">→</span>
               </button>
             </div>
           </div>
@@ -298,17 +305,22 @@ const scrollToBottom = () => {
 // 开始模拟 - 立即跳转，API调用在Process页面进行
 const startSimulation = () => {
   if (!canSubmit.value || loading.value) return
-  
+
   // 存储待上传的数据
   import('../store/pendingUpload.js').then(({ setPendingUpload }) => {
     setPendingUpload(files.value, formData.value.simulationRequirement)
-    
+
     // 立即跳转到Process页面（使用特殊标识表示新建项目）
     router.push({
       name: 'Process',
       params: { projectId: 'new' }
     })
   })
+}
+
+// Phase 8 — alternate entry point: research-from-prompt instead of file upload
+const goToResearch = () => {
+  router.push({ name: 'Research' })
 }
 </script>
 
@@ -872,6 +884,32 @@ const startSimulation = () => {
   cursor: not-allowed;
   transform: none;
   border: 1px solid #E5E5E5;
+}
+
+/* Phase 8 — alternate entry to Step 0 (research from prompt) */
+.research-link-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 16px;
+  background: transparent;
+  color: #ff4500;
+  border: 1px dashed #ff4500;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.research-link-btn:hover {
+  background: #fff8f5;
+}
+
+.research-link-btn .btn-arrow {
+  margin-left: 6px;
 }
 
 /* 引导动画：微妙的边框脉冲 */

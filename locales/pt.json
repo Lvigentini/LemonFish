@@ -69,7 +69,8 @@
     "promptPlaceholder": "// Descreva seu requisito de simulação ou previsão em linguagem natural",
     "engineBadge": "Motor: MiroFish-V1.0",
     "startEngine": "Iniciar Motor",
-    "initializing": "Inicializando..."
+    "initializing": "Inicializando...",
+    "startWithResearch": "Ou começar com um prompt de pesquisa"
   },
   "main": {
     "layoutGraph": "Grafo",
@@ -704,5 +705,45 @@
     "llmModelFailed": "Modelo {model} falhou, tentando próximo fallback: {error}",
     "llmAllModelsFailed": "Todos os modelos esgotados. Último erro: {error}",
     "llmRetrySuccess": "Chamada LLM bem-sucedida na tentativa {attempt} com modelo {model}"
+  },
+  "research": {
+    "setupTitle": "Pesquisa a partir de prompt",
+    "setupDesc": "Pule o upload de documentos — descreva o que você quer prever e nossos agentes de pesquisa reunirão o material para você.",
+    "promptLabel": "O que você quer prever?",
+    "promptPlaceholder": "ex. adoção de caminhões elétricos no transporte UE 2026-2030",
+    "simulationRequirementLabel": "Requisito da simulação",
+    "simulationRequirementPlaceholder": "Que tipo de simulação social deve seguir?",
+    "runnerLabel": "Executor de pesquisa",
+    "refreshRunners": "Atualizar status dos executores",
+    "checkingRunners": "Verificando executores instalados…",
+    "runnerReady": "Instalado e autenticado — pronto para uso",
+    "runnerNeedsAuth": "Instalado mas não autenticado",
+    "runnerNotInstalled": "Não instalado",
+    "runnerApiLabel": "API + Busca web (alternativa)",
+    "startResearch": "Iniciar pesquisa →",
+    "startWithResearch": "Ou começar com um prompt de pesquisa",
+    "subTopicsTitle": "Subtópicos",
+    "previewTitle": "Documento de pesquisa compilado",
+    "previewDesc": "Revise o material compilado abaixo. Ao continuar, ele se tornará o documento fonte para a geração de ontologia.",
+    "charsCount": "{n} caracteres",
+    "subTopicsCount": "{n} subtópicos",
+    "citationsCount": "{n} citações",
+    "citations": "Citações",
+    "promote": "Continuar para geração de ontologia →",
+    "startOver": "Começar de novo",
+    "errorTitle": "Pesquisa falhou",
+    "tryAgain": "Tentar novamente",
+    "moduleDisabled": "O módulo de pesquisa não está habilitado neste servidor.",
+    "unknownError": "Erro desconhecido",
+    "cancelledByUser": "Cancelado pelo usuário",
+    "phase": {
+      "pending": "Aguardando início",
+      "planning": "Planejando perguntas de pesquisa",
+      "researching": "Executando agentes de pesquisa",
+      "synthesising": "Compilando resultados",
+      "completed": "Pesquisa completa",
+      "failed": "Pesquisa falhou",
+      "cancelled": "Pesquisa cancelada"
+    }
   }
 }

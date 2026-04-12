@@ -69,7 +69,8 @@
     "promptPlaceholder": "// 用自然语言输入模拟或预测需求（例.武大若发布撤销肖某处分的公告，会引发什么舆情走向）",
     "engineBadge": "引擎: MiroFish-V1.0",
     "startEngine": "启动引擎",
-    "initializing": "初始化中..."
+    "initializing": "初始化中...",
+    "startWithResearch": "或从研究提示词开始"
   },
   "main": {
     "layoutGraph": "图谱",
@@ -704,5 +705,45 @@
     "llmModelFailed": "模型 {model} 失败，尝试下一个备选模型：{error}",
     "llmAllModelsFailed": "所有模型均已耗尽。最后一个错误：{error}",
     "llmRetrySuccess": "LLM 调用在第 {attempt} 次尝试中使用模型 {model} 成功"
+  },
+  "research": {
+    "setupTitle": "从提示词进行研究",
+    "setupDesc": "跳过文档上传 — 描述您想预测的内容，研究代理将为您收集材料。",
+    "promptLabel": "您想预测什么？",
+    "promptPlaceholder": "例如：2026-2030 年欧盟货运中电动卡车的采用",
+    "simulationRequirementLabel": "模拟要求",
+    "simulationRequirementPlaceholder": "应该进行什么类型的社会模拟？",
+    "runnerLabel": "研究运行器",
+    "refreshRunners": "刷新运行器状态",
+    "checkingRunners": "正在检测已安装的运行器…",
+    "runnerReady": "已安装并已认证 — 可以使用",
+    "runnerNeedsAuth": "已安装但未认证",
+    "runnerNotInstalled": "未安装",
+    "runnerApiLabel": "API + 网络搜索（后备）",
+    "startResearch": "开始研究 →",
+    "startWithResearch": "或从研究提示词开始",
+    "subTopicsTitle": "子主题",
+    "previewTitle": "已编译的研究文档",
+    "previewDesc": "查看下面的编译材料。继续时，这将成为本体生成步骤的源文档。",
+    "charsCount": "{n} 个字符",
+    "subTopicsCount": "{n} 个子主题",
+    "citationsCount": "{n} 个引用",
+    "citations": "引用",
+    "promote": "继续到本体生成 →",
+    "startOver": "重新开始",
+    "errorTitle": "研究失败",
+    "tryAgain": "重试",
+    "moduleDisabled": "此服务器未启用研究模块。",
+    "unknownError": "未知错误",
+    "cancelledByUser": "已被用户取消",
+    "phase": {
+      "pending": "等待开始",
+      "planning": "规划研究问题",
+      "researching": "运行研究代理",
+      "synthesising": "编译结果",
+      "completed": "研究完成",
+      "failed": "研究失败",
+      "cancelled": "研究已取消"
+    }
   }
 }

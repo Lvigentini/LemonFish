@@ -69,7 +69,8 @@
     "promptPlaceholder": "// Describe your simulation or prediction requirement in natural language",
     "engineBadge": "Engine: MiroFish-V1.0",
     "startEngine": "Start Engine",
-    "initializing": "Initializing..."
+    "initializing": "Initializing...",
+    "startWithResearch": "Or start with a research prompt"
   },
   "main": {
     "layoutGraph": "Graph",
@@ -704,5 +705,45 @@
     "llmModelFailed": "Model {model} failed, trying next fallback: {error}",
     "llmAllModelsFailed": "All models exhausted. Last error: {error}",
     "llmRetrySuccess": "LLM call succeeded on attempt {attempt} with model {model}"
+  },
+  "research": {
+    "setupTitle": "Research from Prompt",
+    "setupDesc": "Skip the document upload — describe what you want to predict and our research agents will gather material for you.",
+    "promptLabel": "What do you want to predict?",
+    "promptPlaceholder": "e.g. EV truck adoption in EU haulage 2026-2030",
+    "simulationRequirementLabel": "Simulation requirement",
+    "simulationRequirementPlaceholder": "What kind of social simulation should follow?",
+    "runnerLabel": "Research runner",
+    "refreshRunners": "Refresh runner status",
+    "checkingRunners": "Probing installed runners…",
+    "runnerReady": "Installed and authenticated — ready to use",
+    "runnerNeedsAuth": "Installed but not authenticated",
+    "runnerNotInstalled": "Not installed",
+    "runnerApiLabel": "API + Web Search (fallback)",
+    "startResearch": "Start research →",
+    "startWithResearch": "Or start with a research prompt",
+    "subTopicsTitle": "Sub-topics",
+    "previewTitle": "Compiled research document",
+    "previewDesc": "Review the compiled material below. When you continue, this becomes the source document for the existing ontology generation step.",
+    "charsCount": "{n} characters",
+    "subTopicsCount": "{n} sub-topics",
+    "citationsCount": "{n} citations",
+    "citations": "Citations",
+    "promote": "Continue to ontology generation →",
+    "startOver": "Start over",
+    "errorTitle": "Research failed",
+    "tryAgain": "Try again",
+    "moduleDisabled": "The research module is not enabled on this server.",
+    "unknownError": "Unknown error",
+    "cancelledByUser": "Cancelled by user",
+    "phase": {
+      "pending": "Waiting to start",
+      "planning": "Planning research questions",
+      "researching": "Running research agents",
+      "synthesising": "Compiling results",
+      "completed": "Research complete",
+      "failed": "Research failed",
+      "cancelled": "Research cancelled"
+    }
   }
 }

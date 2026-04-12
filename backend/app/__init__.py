@@ -67,7 +67,24 @@ def create_app(config_class=Config):
     app.register_blueprint(graph_bp, url_prefix='/api/graph')
     app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
     app.register_blueprint(report_bp, url_prefix='/api/report')
-    
+
+    # Phase 8 — Research-from-prompt add-on module (opt-in).
+    # The module's import is fully optional: if the package is missing or
+    # RESEARCH_ENABLED=false, the main app starts unchanged with no
+    # /api/research/* routes registered.
+    try:
+        from research import is_enabled as research_enabled, register_blueprint as register_research
+        if research_enabled():
+            register_research(app)
+            if should_log_startup:
+                logger.info("Research module enabled — /api/research/* registered")
+        else:
+            if should_log_startup:
+                logger.info("Research module installed but disabled (RESEARCH_ENABLED=false)")
+    except ImportError:
+        if should_log_startup:
+            logger.info("Research module not installed (skipping)")
+
     # 健康检查
     @app.route('/health')
     def health():

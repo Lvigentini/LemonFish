@@ -69,7 +69,8 @@
     "promptPlaceholder": "// Beschreiben Sie Ihre Simulations- oder Vorhersageanforderung in natürlicher Sprache",
     "engineBadge": "Engine: MiroFish-V1.0",
     "startEngine": "Engine starten",
-    "initializing": "Initialisierung..."
+    "initializing": "Initialisierung...",
+    "startWithResearch": "Oder mit einer Recherche-Eingabeaufforderung beginnen"
   },
   "main": {
     "layoutGraph": "Graph",
@@ -704,5 +705,45 @@
     "llmModelFailed": "Modell {model} fehlgeschlagen, nächstes Fallback wird versucht: {error}",
     "llmAllModelsFailed": "Alle Modelle ausgeschöpft. Letzter Fehler: {error}",
     "llmRetrySuccess": "LLM-Aufruf erfolgreich bei Versuch {attempt} mit Modell {model}"
+  },
+  "research": {
+    "setupTitle": "Recherche aus Eingabeaufforderung",
+    "setupDesc": "Überspringen Sie den Dokumenten-Upload — beschreiben Sie, was Sie vorhersagen möchten, und unsere Recherche-Agenten sammeln das Material für Sie.",
+    "promptLabel": "Was möchten Sie vorhersagen?",
+    "promptPlaceholder": "z. B. Einführung von E-Lkw im EU-Güterverkehr 2026-2030",
+    "simulationRequirementLabel": "Simulationsanforderung",
+    "simulationRequirementPlaceholder": "Welche Art von sozialer Simulation soll folgen?",
+    "runnerLabel": "Recherche-Runner",
+    "refreshRunners": "Runner-Status aktualisieren",
+    "checkingRunners": "Installierte Runner werden geprüft…",
+    "runnerReady": "Installiert und authentifiziert — einsatzbereit",
+    "runnerNeedsAuth": "Installiert aber nicht authentifiziert",
+    "runnerNotInstalled": "Nicht installiert",
+    "runnerApiLabel": "API + Websuche (Fallback)",
+    "startResearch": "Recherche starten →",
+    "startWithResearch": "Oder mit einer Recherche-Eingabeaufforderung beginnen",
+    "subTopicsTitle": "Unterthemen",
+    "previewTitle": "Zusammengestelltes Rechercheergebnis",
+    "previewDesc": "Überprüfen Sie das zusammengestellte Material unten. Beim Fortfahren wird dies zum Quelldokument für die Ontologie-Generierung.",
+    "charsCount": "{n} Zeichen",
+    "subTopicsCount": "{n} Unterthemen",
+    "citationsCount": "{n} Zitate",
+    "citations": "Zitate",
+    "promote": "Weiter zur Ontologie-Generierung →",
+    "startOver": "Von vorn beginnen",
+    "errorTitle": "Recherche fehlgeschlagen",
+    "tryAgain": "Erneut versuchen",
+    "moduleDisabled": "Das Recherche-Modul ist auf diesem Server nicht aktiviert.",
+    "unknownError": "Unbekannter Fehler",
+    "cancelledByUser": "Vom Benutzer abgebrochen",
+    "phase": {
+      "pending": "Wartet auf Start",
+      "planning": "Plant Recherchefragen",
+      "researching": "Führt Recherche-Agenten aus",
+      "synthesising": "Stellt Ergebnisse zusammen",
+      "completed": "Recherche abgeschlossen",
+      "failed": "Recherche fehlgeschlagen",
+      "cancelled": "Recherche abgebrochen"
+    }
   }
 }

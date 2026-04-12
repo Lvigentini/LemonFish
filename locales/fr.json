@@ -69,7 +69,8 @@
     "promptPlaceholder": "// Décrivez votre exigence de simulation ou de prédiction en langage naturel",
     "engineBadge": "Moteur : MiroFish-V1.0",
     "startEngine": "Démarrer le moteur",
-    "initializing": "Initialisation..."
+    "initializing": "Initialisation...",
+    "startWithResearch": "Ou commencer avec une invite de recherche"
   },
   "main": {
     "layoutGraph": "Graphe",
@@ -704,5 +705,45 @@
     "llmModelFailed": "Le modèle {model} a échoué, passage au modèle suivant : {error}",
     "llmAllModelsFailed": "Tous les modèles épuisés. Dernière erreur : {error}",
     "llmRetrySuccess": "Appel LLM réussi à la tentative {attempt} avec le modèle {model}"
+  },
+  "research": {
+    "setupTitle": "Recherche à partir d’une invite",
+    "setupDesc": "Sautez le téléchargement de documents — décrivez ce que vous voulez prédire et nos agents de recherche rassembleront le matériel pour vous.",
+    "promptLabel": "Que voulez-vous prédire ?",
+    "promptPlaceholder": "p. ex. adoption des camions électriques dans le transport UE 2026-2030",
+    "simulationRequirementLabel": "Exigence de simulation",
+    "simulationRequirementPlaceholder": "Quel type de simulation sociale doit suivre ?",
+    "runnerLabel": "Exécuteur de recherche",
+    "refreshRunners": "Actualiser le statut des exécuteurs",
+    "checkingRunners": "Vérification des exécuteurs installés…",
+    "runnerReady": "Installé et authentifié — prêt à l’emploi",
+    "runnerNeedsAuth": "Installé mais non authentifié",
+    "runnerNotInstalled": "Non installé",
+    "runnerApiLabel": "API + Recherche web (repli)",
+    "startResearch": "Démarrer la recherche →",
+    "startWithResearch": "Ou commencer avec une invite de recherche",
+    "subTopicsTitle": "Sous-thèmes",
+    "previewTitle": "Document de recherche compilé",
+    "previewDesc": "Examinez le matériel compilé ci-dessous. En continuant, il deviendra le document source pour la génération d’ontologie.",
+    "charsCount": "{n} caractères",
+    "subTopicsCount": "{n} sous-thèmes",
+    "citationsCount": "{n} citations",
+    "citations": "Citations",
+    "promote": "Continuer vers la génération d’ontologie →",
+    "startOver": "Recommencer",
+    "errorTitle": "Échec de la recherche",
+    "tryAgain": "Réessayer",
+    "moduleDisabled": "Le module de recherche n’est pas activé sur ce serveur.",
+    "unknownError": "Erreur inconnue",
+    "cancelledByUser": "Annulé par l’utilisateur",
+    "phase": {
+      "pending": "En attente de démarrage",
+      "planning": "Planification des questions de recherche",
+      "researching": "Exécution des agents de recherche",
+      "synthesising": "Compilation des résultats",
+      "completed": "Recherche terminée",
+      "failed": "Échec de la recherche",
+      "cancelled": "Recherche annulée"
+    }
   }
 }

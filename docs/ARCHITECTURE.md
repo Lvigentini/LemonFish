@@ -766,3 +766,71 @@ All configuration via environment variables (loaded from `MiroFish/.env`):
 | `app/services/zep_tools.py` | ~600 | Report retrieval tools |
 | `scripts/run_parallel_simulation.py` | ~700 | Dual-platform simulation script |
 | `scripts/run_reddit_simulation.py` | ~600 | Reddit simulation script |
+
+---
+
+## 9. Research Module (Phase 8, opt-in add-on)
+
+Added in v0.10.0, the research module is an optional add-on that plugs in **before** Step 1. It replaces the "upload documents" entry point with a "research from prompt" flow: the user gives a vague intent, research agents gather material via web search, and the compiled output becomes the same `uploads/projects/{project_id}/extracted_text.txt` that the existing ontology generator already consumes.
+
+**Integration seam:** the module does not modify any existing pipeline code. It writes the compiled document to the project's standard extracted text path and advances the project status so Step 1 picks it up unchanged.
+
+**Conditional registration:** `backend/app/__init__.py` imports the module inside a `try/except ImportError` block and only calls `register_blueprint(app)` when `RESEARCH_ENABLED=true`. With the module absent or disabled, the main app starts with zero behavioural change and no `/api/research/*` routes.
+
+### Module layout
+
+```
+backend/research/
+  __init__.py                 # is_enabled(), register_blueprint()
+  config.py                   # RESEARCH_* env vars
+  api.py                      # Flask blueprint with 7 endpoints
+  orchestrator.py             # Plan → Research → Synthesise driver
+  models.py                   # ResearchTask, SubTopic, ResearchSummary + on-disk persistence
+  availability.py             # Cross-runner availability aggregator
+  runners/
+    base.py                   # CLIRunner ABC, AvailabilityResult
+    api_runner.py             # Fallback: LLMClient + duckduckgo-search
+    claude_runner.py          # Claude Code CLI subprocess wrapper
+    codex_runner.py           # OpenAI Codex CLI subprocess wrapper
+    kimi_runner.py            # Moonshot Kimi CLI subprocess wrapper
+  search/
+    ddg.py                    # duckduckgo-search client wrapper
+```
+
+### Three-phase orchestrator
+
+Each research task runs in a daemon thread on the Flask process:
+
+1. **Plan** — 1 LLM call via `Config.get_step_llm_config('research_plan')` decomposes the vague prompt into 3-8 sub-topics with specific research questions
+2. **Research** — `ThreadPoolExecutor` fans out sub-topics to the chosen runner (up to `RESEARCH_MAX_PARALLEL` in parallel); each runner returns a `ResearchSummary` with citations
+3. **Synthesise** — 1 LLM call via `Config.get_step_llm_config('research_synthesis')` merges the summaries into a single coherent compiled document
+
+State is persisted to `uploads/research/{task_id}/state.json` after every phase transition, so tasks survive restarts and the frontend's polling endpoint (`/api/research/status/<task_id>`) always sees current state.
+
+### Runner pattern
+
+Each runner is a thin subprocess wrapper (CLI runners) or HTTP loop (API runner) implementing `CLIRunner.is_available()` and `CLIRunner.run(sub_topic, system_prompt, timeout)`. The orchestrator does not care which runner is used — it dispatches purely by name. Runners are registered in the orchestrator's registry on module import; missing runner modules fail silently so the API fallback always works.
+
+CLI runners shell out with an **explicit minimal environment** (`PATH`, `HOME`, `USER`, `LANG`, `TERM`, `TMPDIR`, `SHELL`, plus CLI-specific keys like `OPENAI_API_KEY` or `MOONSHOT_API_KEY`). LemonFish secrets like `LLM_API_KEY` and `ZEP_API_KEY` are deliberately stripped before the CLI is invoked so they don't leak into the CLI tool's context or logs.
+
+### Reuses from earlier phases
+
+| Research module needs | Provided by | File |
+|-----------------------|-------------|------|
+| Per-phase LLM routing | Phase 2 | `Config.get_step_llm_config()` |
+| Retry + fallback for LLM calls | Phase 0 | `LLMClient` with exponential backoff |
+| JSON mode with prompt-based fallback | Phase 5 | `LLMClient.chat_json` capability auto-detection |
+| Task cancellation | Phase 7 | `TaskManager.request_cancel / is_cancelled` |
+| Project creation + storage layout | Phase 0 | `ProjectManager.create_project / save_extracted_text` |
+
+### Docker support
+
+Because the CLI runners need the user's host OAuth credentials (`~/.claude`, `~/.codex`, `~/.config/kimi`), the slim Docker image does not enable the research module by default. Users opt in via the research compose overlay:
+
+```bash
+docker compose -f docker-compose.slim.yml -f docker-compose.research.yml up -d
+```
+
+The overlay sets `RESEARCH_ENABLED=true` and mounts the three CLI config directories read-only into the container. Windows users (or deployments without those CLIs installed) can still use the API fallback runner (`RESEARCH_RUNNERS=api`), which only needs the existing `LLM_API_KEY` and the `ddgs` package.
+
+See **[docs/research_module.md](./research_module.md)** for the full user guide, runner details, API surface, and troubleshooting.

@@ -1,0 +1,52 @@
+# Phase 8 — Research module overlay
+#
+# Compose this with the slim base to enable the optional research-from-prompt
+# add-on module inside the slim Docker image:
+#
+#     docker compose -f docker-compose.slim.yml -f docker-compose.research.yml up -d
+#
+# What this overlay does:
+#
+#   1. Sets RESEARCH_ENABLED=true so the backend's app/__init__.py mounts
+#      the /api/research/* blueprint
+#   2. Mounts the user's CLI OAuth config directories from the host into
+#      the container, read-only, so the claude / codex / kimi runners can
+#      use the user's existing subscription credentials without logging in
+#      from inside the container
+#
+# Auth model:
+#
+#   - Claude Code:    ~/.claude            → /root/.claude (ro)
+#   - OpenAI Codex:   ~/.codex             → /root/.codex (ro)
+#   - Kimi CLI:       ~/.config/kimi       → /root/.config/kimi (ro)
+#
+# If a directory does not exist on the host, Docker will simply skip the
+# mount (or create an empty dir, depending on your version) — the
+# corresponding runner will then report `available=true, auth_ok=false` in
+# /api/research/availability and the frontend Step 0 picker will grey it out.
+#
+# Linux/macOS only. Windows users should run via WSL or use the API
+# fallback runner (RESEARCH_RUNNERS=api), which only needs the existing
+# LLM_API_KEY and the duckduckgo-search package.
+#
+# Note: this overlay does NOT install the CLI tools inside the container.
+# The CLI binaries themselves are NOT bundled in the slim image (they would
+# bloat it back up). The runners shell out to whatever is on PATH inside
+# the container — so for the CLI runners to work in Docker, you must use a
+# variant of the slim image that includes them, or add the install step to
+# Dockerfile.slim. The default slim image only ships the API fallback runner.
+
+services:
+  mirofish:
+    environment:
+      - RESEARCH_ENABLED=true
+      # Comma-separated subset of: claude, codex, kimi, api
+      # Default to api-only since CLI tools aren't installed in slim by default.
+      - RESEARCH_RUNNERS=${RESEARCH_RUNNERS:-api}
+      - RESEARCH_DEFAULT_RUNNER=${RESEARCH_DEFAULT_RUNNER:-api}
+    volumes:
+      # Read-only mounts of the user's CLI OAuth credentials.
+      # Comment out any line for a CLI tool you have not installed locally.
+      - ${HOME}/.claude:/root/.claude:ro
+      - ${HOME}/.codex:/root/.codex:ro
+      - ${HOME}/.config/kimi:/root/.config/kimi:ro

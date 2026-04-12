@@ -41,6 +41,15 @@ dev = [
     "pipreqs>=0.5.0",
 ]
 
+# Phase 8 — Research-from-prompt module dependencies.
+# Install with: uv sync --extra research
+# Only required when RESEARCH_ENABLED=true and the api runner is used.
+# CLI runners (claude / codex / kimi) do not need these — they shell out
+# to locally-installed CLI tools instead.
+research = [
+    "ddgs>=9.0.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

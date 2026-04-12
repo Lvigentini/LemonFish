@@ -69,7 +69,8 @@
     "promptPlaceholder": "// Describe tu requisito de simulación o predicción en lenguaje natural",
     "engineBadge": "Motor: MiroFish-V1.0",
     "startEngine": "Iniciar Motor",
-    "initializing": "Inicializando..."
+    "initializing": "Inicializando...",
+    "startWithResearch": "O empezar con un mensaje de investigación"
   },
   "main": {
     "layoutGraph": "Grafo",
@@ -704,5 +705,45 @@
     "llmModelFailed": "El modelo {model} falló, intentando siguiente alternativa: {error}",
     "llmAllModelsFailed": "Todos los modelos agotados. Último error: {error}",
     "llmRetrySuccess": "Llamada al LLM exitosa en el intento {attempt} con el modelo {model}"
+  },
+  "research": {
+    "setupTitle": "Investigación desde un mensaje",
+    "setupDesc": "Sáltate la carga de documentos: describe qué quieres predecir y nuestros agentes de investigación reunirán el material por ti.",
+    "promptLabel": "¿Qué quieres predecir?",
+    "promptPlaceholder": "p. ej. adopción de camiones eléctricos en el transporte europeo 2026-2030",
+    "simulationRequirementLabel": "Requisito de la simulación",
+    "simulationRequirementPlaceholder": "¿Qué tipo de simulación social debe seguir?",
+    "runnerLabel": "Motor de investigación",
+    "refreshRunners": "Actualizar estado de motores",
+    "checkingRunners": "Comprobando motores instalados…",
+    "runnerReady": "Instalado y autenticado — listo para usar",
+    "runnerNeedsAuth": "Instalado pero no autenticado",
+    "runnerNotInstalled": "No instalado",
+    "runnerApiLabel": "API + Búsqueda web (respaldo)",
+    "startResearch": "Iniciar investigación →",
+    "startWithResearch": "O empezar con un mensaje de investigación",
+    "subTopicsTitle": "Subtemas",
+    "previewTitle": "Documento de investigación compilado",
+    "previewDesc": "Revisa el material compilado abajo. Al continuar, será el documento fuente para la generación de ontología.",
+    "charsCount": "{n} caracteres",
+    "subTopicsCount": "{n} subtemas",
+    "citationsCount": "{n} citas",
+    "citations": "Citas",
+    "promote": "Continuar a generación de ontología →",
+    "startOver": "Empezar de nuevo",
+    "errorTitle": "La investigación falló",
+    "tryAgain": "Intentar de nuevo",
+    "moduleDisabled": "El módulo de investigación no está habilitado en este servidor.",
+    "unknownError": "Error desconocido",
+    "cancelledByUser": "Cancelado por el usuario",
+    "phase": {
+      "pending": "Esperando para comenzar",
+      "planning": "Planificando preguntas de investigación",
+      "researching": "Ejecutando agentes de investigación",
+      "synthesising": "Compilando resultados",
+      "completed": "Investigación completa",
+      "failed": "La investigación falló",
+      "cancelled": "Investigación cancelada"
+    }
   }
 }

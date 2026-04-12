@@ -178,6 +178,34 @@ if [ -z "$ZEP_API_KEY" ]; then
     exit 1
 fi
 
+# --- Optional: Phase 8 research-from-prompt module ---
+echo ""
+echo "┌─────────────────────────────────────────────────┐"
+echo "│ Step 3: Research module (optional)              │"
+echo "├─────────────────────────────────────────────────┤"
+echo "│ Enables Step 0 'research from prompt' as an     │"
+echo "│ alternative to uploading documents. Uses CLI    │"
+echo "│ tools (claude/codex/kimi) or an API fallback.   │"
+echo "│ Default: API fallback only.                     │"
+echo "└─────────────────────────────────────────────────┘"
+printf "Enable research module? [y/N]: "
+read -r RESEARCH_CHOICE
+case "$RESEARCH_CHOICE" in
+    [yY]|[yY][eE][sS])
+        RESEARCH_ENABLED="true"
+        echo ""
+        echo "  Research module enabled."
+        echo "  To use the local CLI runners (claude/codex/kimi) instead of the API"
+        echo "  fallback, launch with the research compose overlay:"
+        echo "    docker compose -f docker-compose.slim.yml -f docker-compose.research.yml up -d"
+        echo "  This mounts your ~/.claude, ~/.codex, ~/.config/kimi config dirs into"
+        echo "  the container so the CLIs can find their cached OAuth tokens."
+        ;;
+    *)
+        RESEARCH_ENABLED="false"
+        ;;
+esac
+
 # --- Write .env ---
 echo ""
 echo "Writing .env configuration..."
@@ -197,6 +225,11 @@ LLM_RETRY_BASE_DELAY=2.0
 
 # Zep Cloud
 ZEP_API_KEY=${ZEP_API_KEY}
+
+# Phase 8 — Research-from-prompt module (opt-in)
+RESEARCH_ENABLED=${RESEARCH_ENABLED}
+RESEARCH_RUNNERS=api
+RESEARCH_DEFAULT_RUNNER=api
 ENVEOF
 
 echo "  .env written successfully."

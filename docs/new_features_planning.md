@@ -97,4 +97,237 @@ At LLMClient init, probe whether the configured provider supports `response_form
 
 ---
 
-## Feature: [placeholder — add next feature here]
+## Feature: Research-From-Prompt Add-On Module
+
+### Rationale
+
+LemonFish currently requires the user to upload curated documents (PDF/MD/TXT) before Step 1 can generate an ontology. This is a high-friction starting point for users with a vague intent ("predict EV truck adoption in EU haulage 2026-2030") but no curated source material. This feature adds an optional **Step 0** that decomposes a vague prompt into research questions, dispatches multiple research agents in parallel via web search, and compiles their findings into the same `extracted_text.txt` artefact the existing pipeline already consumes. **No changes to Step 1-5 code paths.**
+
+The user has explicitly asked for this to be built as a **separate but connected add-on module** so heavy/optional dependencies (CLI wrappers, search libs) stay isolated from the main backend, the module can be enabled/disabled per deployment, and the CLI-OAuth integration does not bleed into the core app's hard requirements.
+
+The user has also explicitly asked to use **CLI OAuth** for OpenAI Codex CLI, Claude Code CLI, and Kimi CLI for the research phase — this lets research-heavy work consume the user's personal subscription rather than burn API credits, and gives each research agent native web search via the CLI tools' built-in capabilities.
+
+### Confirmed design decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Runtime support | Both local dev and Docker, with automatic API fallback when CLIs unavailable | Local hosts have CLIs; Docker users can mount config dirs or fall back to API runner |
+| UI integration | New optional Step 0 prefix before Step 1 | Skippable — user can still upload documents directly |
+| CLI fallback | Pre-flight availability check + explicit user choice | No silent fallback; the user picks Claude / Codex / Kimi / API after seeing what's available |
+| Module structure | Add-on module: own dir, conditionally registered Flask blueprint | Main app starts unchanged when disabled or absent |
+
+### Architecture
+
+```
+User: vague prompt + simulation_requirement
+   ↓
+Frontend Step 0 → POST /api/research/start
+   ↓
+ResearchOrchestrator (background thread, daemon)
+   │
+   ├── PLAN phase (1 LLM call via Config.get_step_llm_config('research_plan'))
+   │     Decompose the prompt into 3-8 sub-topics with research questions
+   │
+   ├── RESEARCH phase (ThreadPoolExecutor, parallel)
+   │     For each sub-topic, dispatch to a CLIRunner or ApiRunner
+   │     Each runner returns a structured ResearchSummary with citations
+   │
+   └── SYNTHESIS phase (1 LLM call via Config.get_step_llm_config('research_synthesis'))
+         Merge N summaries into a single coherent compiled document
+   ↓
+Write compiled document to uploads/projects/{project_id}/extracted_text.txt
+   ↓
+Promote project to ONTOLOGY_GENERATED-ready state
+   ↓
+Frontend transitions to existing Step 1 (ontology generator consumes the file unchanged)
+```
+
+### Module layout
+
+```
+backend/
+  research/                                # NEW add-on module
+    __init__.py                            # exports register_blueprint(app), is_enabled()
+    config.py                              # RESEARCH_* env vars, CLI list, parallelism, timeouts
+    api.py                                 # Flask blueprint with /api/research/* endpoints
+    orchestrator.py                        # ResearchOrchestrator: plan → research → synthesise
+    models.py                              # ResearchTask state, ResearchSummary, SubTopic dataclasses
+    availability.py                        # detect installed/authenticated CLIs and search libs
+    runners/
+      base.py                              # CLIRunner abstract base + ApiRunner protocol
+      claude_runner.py                     # subprocess wrapper for `claude` CLI
+      codex_runner.py                      # subprocess wrapper for `codex` CLI
+      kimi_runner.py                       # subprocess wrapper for `kimi` CLI
+      api_runner.py                        # fallback: LLMClient + duckduckgo_search
+    search/
+      ddg.py                               # DuckDuckGo client wrapper
+
+backend/app/__init__.py                    # ~5-line addition: conditionally register research blueprint
+
+frontend/src/
+  views/Step0Research.vue                  # NEW
+  components/research/ResearchSetup.vue    # prompt + CLI picker (driven by availability probe)
+  components/research/ResearchProgress.vue # per-sub-topic progress
+  components/research/ResearchPreview.vue  # compiled output + citations preview
+  api/research.js                          # NEW
+
+docker-compose.research.yml                # NEW overlay mounting CLI config dirs
+```
+
+### API surface (Flask blueprint at `/api/research`)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/availability` | Pre-flight: returns `{cli_runners: [{name, available, auth, reason}], api_fallback, docker_mode}` |
+| `POST` | `/start` | Body: `{prompt, simulation_requirement, runner_choice, project_name?}`. Creates project + research task, spawns background thread, returns `{project_id, task_id}` |
+| `GET` | `/status/<task_id>` | Returns `{status, phase, sub_topics: [...], error?}`. Frontend polls this |
+| `GET` | `/result/<task_id>` | Returns compiled document text + citation list |
+| `POST` | `/promote/<task_id>` | Writes compiled document to `uploads/projects/{project_id}/extracted_text.txt`, sets project status, returns `{project_id}` |
+
+### CLI runner contract
+
+Each runner implements:
+
+```python
+class CLIRunner(ABC):
+    name: str  # 'claude' | 'codex' | 'kimi' | 'api'
+
+    @abstractmethod
+    def is_available(self) -> AvailabilityResult: ...
+
+    @abstractmethod
+    def run(self, sub_topic: SubTopic, system_prompt: str, timeout: int) -> ResearchSummary: ...
+```
+
+| Runner | Invocation pattern (verify via `--help` before implementing) |
+|--------|--------------------------------------------------------------|
+| `claude_runner.py` | `claude -p "<prompt>" --output-format text` (Claude Code CLI; web search built in) |
+| `codex_runner.py` | `codex exec --no-tui "<prompt>"` (OpenAI Codex CLI; web search via tools) |
+| `kimi_runner.py` | Verify Kimi CLI command and unattended-mode flags during implementation |
+| `api_runner.py` | `LLMClient` + `duckduckgo-search`: loop search → fetch → summarise |
+
+### Configuration (new env vars)
+
+```env
+# Master switch — if false, the research blueprint is not registered
+RESEARCH_ENABLED=true
+
+# Which runners to enable (comma-separated subset of: claude,codex,kimi,api)
+RESEARCH_RUNNERS=claude,codex,kimi,api
+
+# Default runner if frontend doesn't override
+RESEARCH_DEFAULT_RUNNER=api
+
+# Parallelism / timeouts
+RESEARCH_MAX_PARALLEL=5
+RESEARCH_AGENT_TIMEOUT=600
+RESEARCH_PLAN_MIN_SUBTOPICS=3
+RESEARCH_PLAN_MAX_SUBTOPICS=8
+
+# Per-phase LLM overrides (consume Phase 2's get_step_llm_config helper)
+LLM_RESEARCH_PLAN_API_KEY=
+LLM_RESEARCH_PLAN_BASE_URL=
+LLM_RESEARCH_PLAN_MODEL=
+LLM_RESEARCH_SYNTHESIS_API_KEY=
+LLM_RESEARCH_SYNTHESIS_BASE_URL=
+LLM_RESEARCH_SYNTHESIS_MODEL=
+```
+
+`Config.get_step_llm_config()` (added in Phase 2) is consumed unchanged — `'research_plan'` and `'research_synthesis'` become recognised step names purely by convention.
+
+### Conditional blueprint registration
+
+In `backend/app/__init__.py` (~5 lines added):
+
+```python
+try:
+    from ..research import register_blueprint as register_research, is_enabled as research_enabled
+    if research_enabled():
+        register_research(app)
+        app.logger.info("Research module enabled")
+except ImportError:
+    app.logger.info("Research module not installed")
+```
+
+If the `research/` package is missing or `RESEARCH_ENABLED=false`, the main app starts unchanged with no `/api/research/*` routes.
+
+### Docker support
+
+A new compose overlay `docker-compose.research.yml` mounts the user's CLI config dirs read-only:
+
+```yaml
+services:
+  lemonfish:
+    volumes:
+      - ${HOME}/.claude:/root/.claude:ro
+      - ${HOME}/.codex:/root/.codex:ro
+      - ${HOME}/.config/kimi:/root/.config/kimi:ro
+    environment:
+      - RESEARCH_ENABLED=true
+```
+
+Used as `docker compose -f docker-compose.slim.yml -f docker-compose.research.yml up`. The `setup.sh` wizard adds an optional final prompt: "Enable research module? Requires CLI tools installed locally and mounts your `~/.claude`, `~/.codex`, `~/.config/kimi` config dirs into the container." Default: no.
+
+If declined or if the CLIs aren't installed, `RESEARCH_ENABLED=true` with `RESEARCH_RUNNERS=api` still works via the API fallback runner.
+
+### Reuses from earlier phases
+
+| Phase 8 needs | Provided by | File |
+|---------------|-------------|------|
+| Per-step LLM routing for Plan + Synthesise | Phase 2 | `Config.get_step_llm_config()` in `backend/app/config.py` |
+| Token tracking for research-phase LLM consumption | Phase 3 | `TokenTracker` thread-local context |
+| Provider capability detection (synthesis JSON output) | Phase 5 | `LLMClient.chat_json` auto-fallback |
+| Background task lifecycle + cancellation | Phase 7 | `TaskManager` + cancel events |
+| Orphan project cleanup if research fails partway | Phase 7 | existing cleanup hook in graph API |
+| ThreadPoolExecutor pattern for parallel work | already present | `oasis_profile_generator.py` |
+| Subprocess + monitor thread pattern | already present | `simulation_runner.py` |
+| Frontend task polling pattern | already present | `Step1GraphBuild.vue` |
+
+### Implementation phasing
+
+| Step | Scope | Verification |
+|------|-------|--------------|
+| **8.A — Module scaffold** | `backend/research/` skeleton, `__init__.py` with `register_blueprint`/`is_enabled`, conditional mount in `backend/app/__init__.py`, `RESEARCH_ENABLED` config, `/health` endpoint | `curl /api/research/health` returns 200 when enabled, 404 when disabled. App still starts when `research/` dir is removed entirely. |
+| **8.B — Models + storage** | `models.py`, reuse `TaskManager`, persist research task state to `uploads/research/{task_id}/state.json` | Unit test: create task, update progress, read back state |
+| **8.C — ApiRunner + DDG search** | `runners/api_runner.py` and `search/ddg.py`. Loop: search → fetch top N URLs → summarise via `LLMClient`. No CLI dependency. | End-to-end with `runner_choice=api`: compiled doc lands in project's `extracted_text.txt` |
+| **8.D — Orchestrator** | Plan → Research → Synthesise loop. ThreadPoolExecutor for parallel sub-topics. Per-phase LLM calls via `get_step_llm_config('research_plan')` and `('research_synthesis')` | Run end-to-end with just ApiRunner; verify N parallel sub-topics finish independently |
+| **8.E — Availability probe** | `availability.py`: check `claude`/`codex`/`kimi` on PATH; run each tool's `--version` or auth-check; return structured result | `GET /api/research/availability` returns correct results in env where Claude is installed but Codex isn't |
+| **8.F — ClaudeRunner** | Verify flags via `claude --help`. Capture stdout, parse, return summary with citations | End-to-end with `runner_choice=claude` on a host with Claude Code CLI installed |
+| **8.G — CodexRunner** | Verify flags first | Same end-to-end test pattern |
+| **8.H — KimiRunner** | Verify availability + flags first | Same end-to-end test pattern |
+| **8.I — Frontend Step 0** | New view, components, router entry, API client, locale strings × 8. Wire `/availability` probe into the picker. Promote button transitions to existing Step 1 | Manual run-through: enter prompt, watch progress, preview, promote, ontology runs against compiled doc |
+| **8.J — Docker overlay** | `docker-compose.research.yml`, `setup.sh` prompt, docs | `docker compose -f docker-compose.slim.yml -f docker-compose.research.yml up` and verify Claude CLI subprocess works inside the container |
+| **8.K — Plan doc updates** | Cross-link `implementation_plan.md` Phase 8 ↔ this section ↔ `research_module.md` | Docs review |
+
+Steps 8.A–8.D produce a fully functional research feature with no CLI dependency at all (API fallback only). Steps 8.E–8.H layer the CLI runners on top. Steps 8.I–8.K are UX and packaging.
+
+### Risks
+
+| Risk | Mitigation |
+|------|-----------|
+| CLI unattended-mode flags differ from assumed (Codex `exec` syntax may have changed, Kimi CLI may not exist or be alpha) | Verify with `--help` and a smoke test before writing each runner. Failed runners fall back to ApiRunner cleanly. |
+| Output parsing brittleness — CLIs print prose, not JSON | System prompt asks runners to emit `=== SUMMARY ===` and `=== SOURCES ===` blocks. Capture all stdout regardless and treat cleaned text as the summary. |
+| Docker volume mounts fail on Windows hosts | Document Linux/macOS as primary; Windows users use API fallback or WSL |
+| `duckduckgo-search` rate-limited or breaking changes | Pin a version. If DDG breaks, swap for `tavily-python` (paid but reliable) |
+| Citation tracking — research agents must surface source URLs | Make this part of the runner output contract (`ResearchSummary.citations: list[str]`). Synthesis prompt is told to preserve citations inline. |
+| The CLI subprocess inherits parent process environment, leaking `LLM_API_KEY` etc into the CLI tool's context | Pass an explicit minimal environment dict to `subprocess.Popen` (only `PATH`, `HOME`, CLI's own config dir) |
+| Project status state machine — research-driven projects skip the upload step but still need to land in `ONTOLOGY_GENERATED`-ready state | The `/promote` endpoint sets the status explicitly. Verified by exploration that `OntologyGenerator` doesn't care how the file arrived. |
+
+### Open questions (not blockers)
+
+- Should the compiled document target a specific length (~10K-50K chars) to match what an uploaded document looks like? Lean yes — feed this constraint into the synthesis prompt.
+- Should the module emit a `metadata.json` alongside `extracted_text.txt` recording the prompt, sub-topics, runners used, citations, and total tokens? Useful for auditability but not required for v1.
+- Add a "re-research" button if the user is unhappy with the synthesis output, or expect them to start over with a refined prompt? Lean toward the latter for v1.
+- Should the orchestrator emit user-facing strings via existing `t()` keys, or add new keys under a `research` section in each locale file? Lean toward new keys for translator clarity.
+
+### Out of scope (deliberate)
+
+- Persistent caching of research results across runs with the same prompt
+- Automatic re-research when synthesis confidence is low
+- Admin UI for managing CLI installations
+- Multi-pass research (Plan → Research → Critique → Re-research → Synthesise)
+
+### Plan reference
+
+Detailed file-by-file implementation plan: `/Users/lor/.claude/plans/temporal-shimmying-moore.md`
+Roadmap slot: `docs/implementation_plan.md` Phase 8 / v0.10.0
