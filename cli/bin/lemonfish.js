@@ -34,7 +34,7 @@ const __dirname = dirname(__filename);
 // Constants
 // --------------------------------------------------------------------------
 
-const PKG_VERSION = '1.0.3';
+const PKG_VERSION = '1.1.0';
 const BACKEND_BASE = process.env.LEMONFISH_API || 'http://localhost:5001';
 const FRONTEND_BASE = process.env.LEMONFISH_UI || 'http://localhost:3000';
 const BUNDLED_COMPOSE = resolve(__dirname, '..', 'compose', 'docker-compose.yml');

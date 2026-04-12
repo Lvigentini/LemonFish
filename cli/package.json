@@ -1,6 +1,6 @@
 {
   "name": "lemonfish-cli",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "CLI for MiroFish [LemonFish] — multi-agent prediction engine. Manages the Docker container lifecycle and drives the research-from-prompt API so agents can run predictions from a single command.",
   "keywords": [
     "multi-agent",
