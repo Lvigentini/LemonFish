@@ -33,21 +33,36 @@
         <div class="card-header">
           <span class="card-id">{{ formatSimulationId(project.simulation_id) }}</span>
           <div class="card-status-icons">
-            <span 
-              class="status-icon" 
+            <span
+              class="status-icon"
               :class="{ available: project.project_id, unavailable: !project.project_id }"
               :title="$t('history.graphBuild')"
             >◇</span>
-            <span 
-              class="status-icon available" 
+            <span
+              class="status-icon available"
               :title="$t('history.envSetup')"
             >◈</span>
-            <span 
-              class="status-icon" 
+            <span
+              class="status-icon"
               :class="{ available: project.report_id, unavailable: !project.report_id }"
               :title="$t('history.analysisReport')"
             >◆</span>
           </div>
+        </div>
+
+        <!-- Lifecycle status pill — colour-coded so partials are visually distinct -->
+        <div class="card-lifecycle-row">
+          <span class="lifecycle-pill" :class="`lifecycle-${getLifecycleStage(project)}`">
+            {{ getLifecycleLabel(project) }}
+          </span>
+          <button
+            v-if="isPartial(project)"
+            class="resume-quick-btn"
+            :title="`Resume at ${getResumeTarget(project)}`"
+            @click.stop="quickResume(project)"
+          >
+            ⤳ Resume
+          </button>
         </div>
 
         <!-- 文件列表区域 -->
@@ -298,6 +313,75 @@ const getCardStyle = (index) => {
       opacity: 1,
       transition: transition
     }
+  }
+}
+
+// Lifecycle classification — derives a single canonical stage from the
+// SimulationState.status field plus runner_status. The history payload
+// already includes both (see GET /api/simulation/history docstring).
+//
+// Stages:
+//   created       — record exists, no profiles/config yet
+//   ready         — profiles + config generated, never run
+//   running       — OASIS subprocess active
+//   completed     — finished successfully, may have report
+//   failed        — error during prepare or run
+//   stopped       — user-cancelled mid-run; partial data preserved
+//   unknown       — couldn't classify (defensive)
+const getLifecycleStage = (sim) => {
+  if (!sim) return 'unknown'
+  const s = (sim.status || '').toLowerCase()
+  const rs = (sim.runner_status || '').toLowerCase()
+  if (s === 'failed') return 'failed'
+  if (s === 'stopped' || rs === 'stopped' || rs === 'cancelled') return 'stopped'
+  if (s === 'completed' || rs === 'completed') return 'completed'
+  if (s === 'running' || rs === 'running') return 'running'
+  if (s === 'ready') return 'ready'
+  if (s === 'preparing') return 'preparing'
+  if (s === 'created') return 'created'
+  return s || 'unknown'
+}
+
+const LIFECYCLE_LABELS = {
+  created: 'CREATED',
+  preparing: 'PREPARING',
+  ready: 'READY',
+  running: 'RUNNING',
+  completed: 'COMPLETED',
+  failed: 'FAILED',
+  stopped: 'STOPPED',
+  unknown: '—',
+}
+const getLifecycleLabel = (sim) => LIFECYCLE_LABELS[getLifecycleStage(sim)] || 'UNKNOWN'
+
+// A "partial" is any sim that isn't completed and didn't permanently fail —
+// i.e., resumable. Stopped sims count too (user might want to restart).
+const isPartial = (sim) => {
+  const stage = getLifecycleStage(sim)
+  return ['created', 'preparing', 'ready', 'running', 'stopped'].includes(stage)
+}
+
+// Where Resume should drop the user, based on what artifacts exist.
+// Mirrors goToResume() but returns a label for tooltips.
+const getResumeTarget = (sim) => {
+  if (!sim) return '—'
+  if (sim.report_id) return 'Report'
+  if (sim.simulation_id) return 'Step 2 (Environment)'
+  if (sim.project_id) return 'Step 1 (Graph build)'
+  return '—'
+}
+
+// Direct-from-card resume. Bypasses the modal and routes straight to the
+// best landing page based on artifact availability. Mirrors goToResume()
+// but takes the sim as an argument instead of reading selectedProject.
+const quickResume = (sim) => {
+  if (!sim) return
+  if (sim.report_id) {
+    router.push({ name: 'Report', params: { reportId: sim.report_id } })
+  } else if (sim.simulation_id) {
+    router.push({ name: 'Simulation', params: { simulationId: sim.simulation_id } })
+  } else if (sim.project_id) {
+    router.push({ name: 'Process', params: { projectId: sim.project_id } })
   }
 }
 
@@ -740,6 +824,49 @@ onUnmounted(() => {
 }
 
 /* 功能状态图标组 */
+/* Lifecycle pill row + quick resume button (Phase A+B) */
+.card-lifecycle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 16px 0;
+}
+.lifecycle-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.lifecycle-created     { background: #f0f0f0; color: #666; }
+.lifecycle-preparing   { background: #fff3e0; color: #b25a00; }
+.lifecycle-ready       { background: #e1f5fe; color: #0277bd; }
+.lifecycle-running     { background: #fff8e1; color: #8a6100; }
+.lifecycle-completed   { background: #e6f7ea; color: #1b8a3a; }
+.lifecycle-failed      { background: #fde2e2; color: #b42318; }
+.lifecycle-stopped     { background: #f3e5f5; color: #7b1fa2; }
+.lifecycle-unknown     { background: #eeeeee; color: #aaa; }
+
+.resume-quick-btn {
+  background: none;
+  border: 1px solid #FF5722;
+  color: #FF5722;
+  padding: 2px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.02em;
+}
+.resume-quick-btn:hover {
+  background: #FF5722;
+  color: #ffffff;
+}
+
 .card-status-icons {
   display: flex;
   align-items: center;
