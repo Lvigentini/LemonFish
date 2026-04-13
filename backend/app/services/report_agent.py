@@ -1213,14 +1213,18 @@ class ReportAgent:
             
         except Exception as e:
             logger.error(t('report.outlinePlanFailed', error=str(e)))
-            # 返回默认大纲（3个章节，作为fallback）
+            # Safety-net outline returned when LLM planning fails. Using English
+            # defaults rather than Chinese ones so non-Chinese runs don't see
+            # stray CJK section titles. The actual report body is still generated
+            # by the LLM using per-step config, which honours the user's locale
+            # via get_language_instruction() in the system prompt.
             return ReportOutline(
-                title="未来预测报告",
-                summary="基于模拟预测的未来趋势与风险分析",
+                title="Prediction Report",
+                summary="Future trends and risk analysis derived from the simulation.",
                 sections=[
-                    ReportSection(title="预测场景与核心发现"),
-                    ReportSection(title="人群行为预测分析"),
-                    ReportSection(title="趋势展望与风险提示")
+                    ReportSection(title="Scenario and core findings"),
+                    ReportSection(title="Population behaviour analysis"),
+                    ReportSection(title="Outlook and risk signals"),
                 ]
             )
     

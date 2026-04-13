@@ -123,6 +123,7 @@ class LLMClient:
         models_to_try = [self.model] + [m for m in self.fallback_models if m != self.model]
 
         last_error = None
+        saw_404 = False
         for model in models_to_try:
             try:
                 response = self._call_with_retry(model, kwargs)
@@ -130,6 +131,32 @@ class LLMClient:
                 # Some models (e.g. MiniMax M2.5) include <think> blocks in content
                 content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
                 return content
+            except APIStatusError as e:
+                last_error = e
+                # 404 at the LLM boundary almost always means the model name
+                # isn't served by the configured base_url — typically a copy/paste
+                # mistake between providers in .env. Log a loud diagnostic the
+                # first time we see one, so the user doesn't just see a cryptic
+                # "models/X is not found" error for the LAST fallback.
+                if e.status_code == 404:
+                    if not saw_404:
+                        logger.error(
+                            f"LLM endpoint returned 404 for model '{model}' at "
+                            f"base_url={self.base_url}. This usually means the model "
+                            f"is not served by this provider. Check that LLM_MODEL_NAME "
+                            f"(and any LLM_<STEP>_MODEL / LLM_FALLBACK_MODELS entries) "
+                            f"match the provider behind LLM_BASE_URL. Skipping further "
+                            f"fallbacks since they were likely also intended for a different provider."
+                        )
+                        saw_404 = True
+                    # For 404s, treat the whole fallback chain as poisoned — we
+                    # already know each subsequent model will also 404 from the
+                    # same endpoint. Fail fast with the clearer first error
+                    # rather than reporting the last one in the chain.
+                    raise last_error
+                if len(models_to_try) > 1:
+                    logger.warning(t('backend.llmModelFailed', model=model, error=f"{type(e).__name__}: {e}"))
+                continue
             except Exception as e:
                 last_error = e
                 if len(models_to_try) > 1:
