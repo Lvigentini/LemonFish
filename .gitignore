@@ -61,8 +61,12 @@ backend/uploads/
 # so this stray is only possible during dev testing.
 /uploads/
 
-# Docker 数据
+# Docker 数据 — blanket ignore for runtime data directories
 data/
+# ...but keep the machine-readable provider catalogue that ships with the repo.
+# It's maintained by the /llm-provider-tracker skill alongside docs/llm_providers.md.
+!backend/data/
+!backend/data/*.json
 
 # Private planning notes — implementation plan, feature brainstorming,
 # and anything that's "my thinking" rather than public reference.

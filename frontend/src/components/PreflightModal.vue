@@ -116,46 +116,93 @@
               <div class="col-budget">Today / Budget</div>
               <div class="col-status">Status</div>
             </div>
-            <div
+            <template
               v-for="row in allocation.providers"
               :key="row.name"
-              class="alloc-row"
-              :class="`status-${row.status}`"
             >
-              <div class="col-name">
-                <div class="provider-name">{{ row.name }}</div>
-                <div class="provider-model">{{ row.model }}</div>
+              <div
+                class="alloc-row"
+                :class="[`status-${row.status}`, { 'has-models': row.models_breakdown && row.models_breakdown.length }]"
+              >
+                <div class="col-name">
+                  <div class="provider-name">
+                    <button
+                      v-if="row.models_breakdown && row.models_breakdown.length"
+                      class="expand-toggle"
+                      @click="toggleExpanded(row.name)"
+                      :aria-expanded="expandedProviders.has(row.name)"
+                    >{{ expandedProviders.has(row.name) ? '▾' : '▸' }}</button>
+                    {{ row.name }}
+                    <span v-if="row.models_breakdown && row.models_breakdown.length" class="multi-badge">
+                      {{ row.models_breakdown.length }} models
+                    </span>
+                  </div>
+                  <div class="provider-model">
+                    <template v-if="row.model">{{ row.model }}</template>
+                    <template v-else>catalogue-driven (click ▸)</template>
+                  </div>
+                </div>
+                <div class="col-slider">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    :value="sliderValues[row.name] || 0"
+                    @input="onSliderInput(row.name, $event.target.value)"
+                  />
+                  <span class="slider-pct">{{ row.share_percent }}%</span>
+                </div>
+                <div class="col-agents">{{ row.assigned_agents }}</div>
+                <div class="col-projected">{{ formatTokens(row.projected_tokens) }}</div>
+                <div class="col-budget">
+                  <template v-if="row.daily_budget">
+                    {{ formatTokens(row.consumed_today) }} / {{ formatTokens(row.daily_budget) }}
+                  </template>
+                  <template v-else>
+                    <span class="muted">no budget set</span>
+                  </template>
+                </div>
+                <div class="col-status">
+                  <span class="status-badge" :class="`badge-${row.status}`">
+                    <template v-if="row.status === 'over'">OVER by {{ formatTokens(row.overage) }}</template>
+                    <template v-else-if="row.status === 'warn'">{{ row.percent_of_budget }}%</template>
+                    <template v-else-if="row.status === 'ok'">OK</template>
+                    <template v-else>∞</template>
+                  </span>
+                </div>
               </div>
-              <div class="col-slider">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="5"
-                  :value="sliderValues[row.name] || 0"
-                  @input="onSliderInput(row.name, $event.target.value)"
-                />
-                <span class="slider-pct">{{ row.share_percent }}%</span>
-              </div>
-              <div class="col-agents">{{ row.assigned_agents }}</div>
-              <div class="col-projected">{{ formatTokens(row.projected_tokens) }}</div>
-              <div class="col-budget">
-                <template v-if="row.daily_budget">
-                  {{ formatTokens(row.consumed_today) }} / {{ formatTokens(row.daily_budget) }}
-                </template>
-                <template v-else>
-                  <span class="muted">no budget set</span>
-                </template>
-              </div>
-              <div class="col-status">
-                <span class="status-badge" :class="`badge-${row.status}`">
-                  <template v-if="row.status === 'over'">OVER by {{ formatTokens(row.overage) }}</template>
-                  <template v-else-if="row.status === 'warn'">{{ row.percent_of_budget }}%</template>
-                  <template v-else-if="row.status === 'ok'">OK</template>
-                  <template v-else>∞</template>
-                </span>
-              </div>
-            </div>
+
+              <!-- Expanded model breakdown for multi-model providers -->
+              <template v-if="row.models_breakdown && expandedProviders.has(row.name)">
+                <div
+                  v-for="m in row.models_breakdown"
+                  :key="row.name + '::' + m.model"
+                  class="alloc-row alloc-submodel"
+                  :class="`status-${m.status}`"
+                >
+                  <div class="col-name submodel-name">
+                    <span class="submodel-indent">└─</span>
+                    <span class="submodel-id">{{ m.model }}</span>
+                  </div>
+                  <div class="col-slider submodel-note">quota-driven</div>
+                  <div class="col-agents">{{ m.agents }}</div>
+                  <div class="col-projected">{{ formatTokens(m.projected_tokens) }}</div>
+                  <div class="col-budget">
+                    <template v-if="m.daily_budget">{{ formatTokens(m.daily_budget) }}</template>
+                    <template v-else><span class="muted">—</span></template>
+                  </div>
+                  <div class="col-status">
+                    <span class="status-badge" :class="`badge-${m.status}`">
+                      <template v-if="m.status === 'over'">OVER by {{ formatTokens(m.overage) }}</template>
+                      <template v-else-if="m.status === 'warn'">{{ m.percent_of_budget }}%</template>
+                      <template v-else-if="m.status === 'ok'">OK</template>
+                      <template v-else>∞</template>
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </template>
           </div>
         </section>
       </div>
@@ -201,6 +248,16 @@ const allocLoading = ref(false)
 // sliderValues holds the raw slider positions (0-100) keyed by provider name.
 // They're the user's input; the backend normalizes them to shares that sum to 1.
 const sliderValues = reactive({})
+
+// Which multi-model provider rows are currently expanded to show their
+// catalogue-driven model breakdown. Initially all collapsed.
+const expandedProviders = ref(new Set())
+const toggleExpanded = (providerName) => {
+  const next = new Set(expandedProviders.value)
+  if (next.has(providerName)) next.delete(providerName)
+  else next.add(providerName)
+  expandedProviders.value = next
+}
 
 const close = () => emit('close')
 
@@ -733,4 +790,57 @@ const costWarningMessage = computed(() => {
   background: #ef4444;
 }
 .btn-proceed.btn-proceed-warn:hover:not(:disabled) { background: #dc2626; }
+
+/* ============ Multi-model provider expansion ============ */
+
+.expand-toggle {
+  background: none;
+  border: none;
+  color: #FF5722;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0 4px 0 0;
+  font-weight: 700;
+  line-height: 1;
+}
+.multi-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: #f3e5f5;
+  color: #7b1fa2;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.alloc-row.alloc-submodel {
+  background: #fafafa;
+  font-size: 0.78rem;
+  border-top: 1px dashed #eeeeee;
+}
+.alloc-row.alloc-submodel.status-over { background: #fff5f5; }
+.alloc-row.alloc-submodel.status-warn { background: #fffdf3; }
+.submodel-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.submodel-indent {
+  color: #bbb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.submodel-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #555;
+  font-size: 0.74rem;
+  word-break: break-all;
+}
+.submodel-note {
+  color: #999;
+  font-size: 0.72rem;
+  font-style: italic;
+}
 </style>

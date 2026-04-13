@@ -69,9 +69,13 @@ def build_assignment(
         weights=weights,
     )
 
-    # Resolve each agent's provider entry to full config
+    # Resolve each agent's provider entry to full config.
+    # Since v1.1.3 allocate_agents returns {agent_id: {"provider": str, "model": str}}
+    # with the per-agent model already chosen (quota-proportional for multi-model
+    # providers). We pull api_key + base_url from the pool entry.
     detailed: Dict[str, Dict[str, Any]] = {}
-    for agent_id, provider_name in assignments.items():
+    for agent_id, choice in assignments.items():
+        provider_name = choice['provider']
         entry = pool.get(provider_name)
         if entry is None:
             continue
@@ -79,7 +83,7 @@ def build_assignment(
             'provider': provider_name,
             'api_key': entry.api_key,
             'base_url': entry.base_url,
-            'model': entry.model,
+            'model': choice['model'],
         }
 
     doc = {

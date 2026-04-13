@@ -3131,9 +3131,65 @@ def preflight_allocation():
                     status = 'ok'
                     overage = 0
 
-            providers_out.append({
+            # Multi-model breakdown: if the provider has a models list,
+            # sub-allocate this provider's agents across its models using
+            # largest-remainder rounding weighted by daily_token_budget.
+            # Quota-less models fall back to uniform within the provider.
+            models_breakdown = None
+            if e.is_multi_model():
+                prov_agents = agent_counts.get(e.name, 0)
+                model_ids = [m.id for m in e.models]
+                model_quotas = [m.daily_token_budget or 0 for m in e.models]
+                total_quota = sum(model_quotas)
+                if total_quota > 0:
+                    shares = [q / total_quota for q in model_quotas]
+                else:
+                    # All quota-less — uniform
+                    n = len(model_ids)
+                    shares = [1.0 / n] * n
+                # Integer agent split using largest-remainder
+                base_counts = []
+                fracs = []
+                acc = 0
+                for sh in shares:
+                    ex = sh * prov_agents
+                    bc = int(ex)
+                    base_counts.append(bc)
+                    fracs.append(ex - bc)
+                    acc += bc
+                leftover_slots = prov_agents - acc
+                order = sorted(range(len(fracs)), key=lambda i: fracs[i], reverse=True)
+                for k in range(leftover_slots):
+                    if not order:
+                        break
+                    base_counts[order[k % len(order)]] += 1
+
+                models_breakdown = []
+                # Projected tokens per model = provider share × model sub-share
+                for i, m in enumerate(e.models):
+                    m_agents = base_counts[i]
+                    m_projected = int(round(projected * shares[i]))
+                    m_budget = m.daily_token_budget
+                    if m_budget and m_budget > 0:
+                        m_overage = max(0, m_projected - m_budget)
+                        m_pct = round(100.0 * m_projected / m_budget, 1)
+                        m_status = 'over' if m_overage > 0 else ('warn' if m_pct >= 80 else 'ok')
+                    else:
+                        m_overage = 0
+                        m_pct = None
+                        m_status = 'unbudgeted'
+                    models_breakdown.append({
+                        'model': m.id,
+                        'agents': m_agents,
+                        'projected_tokens': m_projected,
+                        'daily_budget': m_budget,
+                        'percent_of_budget': m_pct,
+                        'status': m_status,
+                        'overage': m_overage,
+                    })
+
+            provider_row = {
                 'name': e.name,
-                'model': e.model,
                 'weight': round(share, 4),
                 'weight_raw': round(raw_weights[e.name], 4),
                 'share_percent': round(share * 100, 1),
@@ -3145,7 +3201,17 @@ def preflight_allocation():
                 'percent_of_budget': pct,
                 'status': status,
                 'overage': overage,
-            })
+                'source': e.source,
+            }
+            if e.is_multi_model():
+                provider_row['models'] = [m.id for m in e.models]
+                provider_row['models_breakdown'] = models_breakdown
+                provider_row['model'] = None  # back-compat: explicit null
+            else:
+                provider_row['model'] = e.model
+                provider_row['models'] = None
+                provider_row['models_breakdown'] = None
+            providers_out.append(provider_row)
 
         return jsonify({
             "success": True,

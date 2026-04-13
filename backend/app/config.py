@@ -97,33 +97,120 @@ class Config:
         p.strip().lower() for p in os.environ.get('LLM_PROVIDERS', '').split(',') if p.strip()
     ]
 
+    # Path to the machine-readable provider catalogue maintained by the
+    # /llm-provider-tracker skill. If present, providers listed here can
+    # opt into multi-model sub-allocation (one account, many free models).
+    LLM_PROVIDER_CATALOGUE_PATH = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'llm_providers.json'
+    )
+
+    @classmethod
+    def _load_provider_catalogue(cls) -> dict:
+        """Load the multi-model catalogue. Returns {} on missing/invalid file."""
+        import json
+        path = cls.LLM_PROVIDER_CATALOGUE_PATH
+        if not os.path.exists(path):
+            return {}
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                doc = json.load(f)
+            return doc.get('providers', {}) or {}
+        except Exception:
+            # Deliberately silent — missing/malformed catalogue falls back
+            # to single-model behaviour, which is the safe default.
+            return {}
+
     @classmethod
     def get_provider_pool(cls) -> list:
         """Return list of configured multi-provider entries.
 
-        Each entry is a dict with: name, api_key, base_url, model, daily_token_budget (optional).
+        Each entry is a dict with:
+            name, api_key, base_url, daily_token_budget (optional)
+        PLUS one of:
+            model: str                — single-model provider (legacy path)
+            models: list[dict]        — multi-model provider. Each sub-dict:
+                                        {id, daily_token_budget?, rpd?}
+        Provider resolution order (first match wins):
+            1. Catalogue (backend/data/llm_providers.json) for providers with
+               >1 free_models entry → multi-model entry.
+            2. LLM_<NAME>_MODELS env var (comma-separated) → multi-model entry
+               with uniform/unknown quotas. Used for local providers (Ollama)
+               where the catalogue is machine-specific.
+            3. LLM_<NAME>_MODEL env var → single-model entry (legacy / default).
+
         Returns empty list if LLM_PROVIDERS is not set.
         """
+        catalogue = cls._load_provider_catalogue()
         pool = []
         for name in cls.LLM_PROVIDERS:
             prefix = f'LLM_{name.upper()}_'
             api_key = os.environ.get(prefix + 'API_KEY')
             base_url = os.environ.get(prefix + 'BASE_URL')
-            model = os.environ.get(prefix + 'MODEL')
-            if not (api_key and base_url and model):
-                # Incomplete provider block — skip with a warning
+            if not (api_key and base_url):
                 continue
+
             budget_raw = os.environ.get(prefix + 'DAILY_TOKEN_BUDGET', '')
             try:
-                daily_budget = int(budget_raw) if budget_raw else None
+                account_budget = int(budget_raw) if budget_raw else None
             except ValueError:
-                daily_budget = None
+                account_budget = None
+
+            # ---- (1) Catalogue path: provider has a free_models list ----
+            cat_entry = catalogue.get(name) or {}
+            cat_models = cat_entry.get('free_models') or []
+            if len(cat_models) >= 1:
+                # Only use the catalogue base_url if the env one is absent;
+                # respecting .env lets the user override for e.g. proxies.
+                models = [
+                    {
+                        'id': m.get('id'),
+                        'daily_token_budget': m.get('daily_token_budget'),
+                        'rpd': m.get('rpd'),
+                    }
+                    for m in cat_models
+                    if m.get('id')
+                ]
+                if models:
+                    pool.append({
+                        'name': name,
+                        'api_key': api_key,
+                        'base_url': base_url,
+                        'models': models,
+                        # Sum of per-model quotas where known; None if all unknown
+                        'daily_token_budget': account_budget or (
+                            sum(m['daily_token_budget'] for m in models if m.get('daily_token_budget'))
+                            or None
+                        ),
+                        'source': 'catalogue',
+                    })
+                    continue
+
+            # ---- (2) Env list path: LLM_<NAME>_MODELS=m1,m2,m3 ----
+            models_raw = os.environ.get(prefix + 'MODELS', '')
+            model_ids = [m.strip() for m in models_raw.split(',') if m.strip()]
+            if len(model_ids) > 1:
+                pool.append({
+                    'name': name,
+                    'api_key': api_key,
+                    'base_url': base_url,
+                    'models': [{'id': mid, 'daily_token_budget': None, 'rpd': None} for mid in model_ids],
+                    'daily_token_budget': account_budget,  # account-level only
+                    'source': 'env_list',
+                })
+                continue
+
+            # ---- (3) Single-model legacy path ----
+            model = os.environ.get(prefix + 'MODEL')
+            if not model:
+                # No models declared at all — skip incomplete block
+                continue
             pool.append({
                 'name': name,
                 'api_key': api_key,
                 'base_url': base_url,
                 'model': model,
-                'daily_token_budget': daily_budget,
+                'daily_token_budget': account_budget,
+                'source': 'env_single',
             })
         return pool
 

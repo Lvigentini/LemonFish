@@ -1,0 +1,91 @@
+{
+  "$schema": "./llm_providers.schema.json",
+  "description": "Machine-readable mirror of docs/llm_providers.md. Maintained by the /llm-provider-tracker skill in lockstep with the human-readable markdown. The backend reads this file at startup to populate multi-model provider entries in the multi-provider pool. If a provider listed here appears in LLM_PROVIDERS, the backend uses the free_models list instead of the single LLM_<NAME>_MODEL env var.",
+  "last_verified": "2026-04-11",
+  "source_doc": "docs/llm_providers.md",
+  "providers": {
+    "openrouter": {
+      "base_url": "https://openrouter.ai/api/v1",
+      "notes": "Free models have dynamic, undocumented rate limits (~20-200 RPD per model). Quotas below are best-effort estimates; null means unknown.",
+      "free_models": [
+        {
+          "id": "google/gemma-4-31b-it:free",
+          "context": 262144,
+          "daily_token_budget": null,
+          "rpd": null,
+          "verified": "2026-04-11",
+          "source": "https://openrouter.ai/google/gemma-4-31b-it:free"
+        }
+      ]
+    },
+    "groq": {
+      "base_url": "https://api.groq.com/openai/v1",
+      "notes": "Documented free-tier daily token budgets (TPD) per model. RPM/RPD caps are informational; the allocator uses daily_token_budget for proportional splitting. Total free budget across all models ~2.3M tokens/day.",
+      "free_models": [
+        {
+          "id": "llama-3.1-8b-instant",
+          "daily_token_budget": 500000,
+          "rpm": 30,
+          "rpd": 14400,
+          "tpm": 6000,
+          "verified": "2026-04-11",
+          "source": "https://console.groq.com/docs/rate-limits"
+        },
+        {
+          "id": "llama-3.3-70b-versatile",
+          "daily_token_budget": 100000,
+          "rpm": 30,
+          "rpd": 1000,
+          "tpm": 12000,
+          "verified": "2026-04-11",
+          "source": "https://console.groq.com/docs/rate-limits"
+        },
+        {
+          "id": "llama-4-scout-17b-16e",
+          "daily_token_budget": 500000,
+          "rpm": 30,
+          "rpd": 1000,
+          "tpm": 30000,
+          "verified": "2026-04-11",
+          "source": "https://console.groq.com/docs/rate-limits"
+        },
+        {
+          "id": "qwen3-32b",
+          "daily_token_budget": 500000,
+          "rpm": 60,
+          "rpd": 1000,
+          "tpm": 6000,
+          "verified": "2026-04-11",
+          "source": "https://console.groq.com/docs/rate-limits"
+        },
+        {
+          "id": "moonshotai/kimi-k2-instruct",
+          "daily_token_budget": 300000,
+          "rpm": 60,
+          "rpd": 1000,
+          "tpm": 10000,
+          "verified": "2026-04-11",
+          "source": "https://console.groq.com/docs/rate-limits"
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "daily_token_budget": 200000,
+          "rpm": 30,
+          "rpd": 1000,
+          "tpm": 8000,
+          "verified": "2026-04-11",
+          "source": "https://console.groq.com/docs/rate-limits"
+        },
+        {
+          "id": "openai/gpt-oss-20b",
+          "daily_token_budget": 200000,
+          "rpm": 30,
+          "rpd": 1000,
+          "tpm": 8000,
+          "verified": "2026-04-11",
+          "source": "https://console.groq.com/docs/rate-limits"
+        }
+      ]
+    }
+  }
+}
