@@ -235,7 +235,8 @@ class SimulationManager:
         defined_entity_types: Optional[List[str]] = None,
         use_llm_for_profiles: bool = True,
         progress_callback: Optional[callable] = None,
-        parallel_profile_count: int = 3
+        parallel_profile_count: int = 3,
+        max_agents: Optional[int] = None,
     ) -> SimulationState:
         """
         准备模拟环境（全程自动化）
@@ -283,7 +284,17 @@ class SimulationManager:
                 defined_entity_types=defined_entity_types,
                 enrich_with_edges=True
             )
-            
+
+            # Phase C: cap the agent count if requested. We trim AFTER filtering
+            # so entity_type filters still apply. Keep entities in whatever order
+            # Zep returned — no extra ranking heuristic here.
+            if max_agents is not None and max_agents > 0 and len(filtered.entities) > max_agents:
+                logger.info(
+                    f"Capping agent count: {len(filtered.entities)} -> {max_agents}"
+                )
+                filtered.entities = filtered.entities[:max_agents]
+                filtered.filtered_count = len(filtered.entities)
+
             state.entities_count = filtered.filtered_count
             state.entity_types = list(filtered.entity_types)
             

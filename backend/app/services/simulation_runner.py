@@ -398,9 +398,10 @@ class SimulationRunner:
         cls,
         simulation_id: str,
         platform: str = "parallel",  # twitter / reddit / parallel
-        max_rounds: int = None,  # maxsimulationround count (optional, used fortruncate overly longsimulation) 
+        max_rounds: int = None,  # maxsimulationround count (optional, used fortruncate overly longsimulation)
         enable_graph_memory_update: bool = False,  # 是否将活动更新到Zep图谱
-        graph_id: str = None  # Zep图谱ID（启用图谱更新时必需）
+        graph_id: str = None,  # Zep图谱ID（启用图谱更新时必需）
+        provider_weights: dict = None,  # optional {provider: float} for multi-provider allocation
     ) -> SimulationRunState:
         """
         启动模拟
@@ -547,6 +548,7 @@ class SimulationRunner:
                         agent_ids=list(range(agent_count)),
                         seed=seed,
                         only_reachable=False,
+                        weights=provider_weights,
                     )
                     if assignment_path is not None:
                         env['MIROFISH_AGENT_MODEL_ASSIGNMENTS'] = str(assignment_path)

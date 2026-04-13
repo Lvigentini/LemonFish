@@ -48,12 +48,15 @@ def build_assignment(
     agent_ids: List[Any],
     seed: Optional[int] = None,
     only_reachable: bool = False,
+    weights: Optional[Dict[str, float]] = None,
 ) -> Optional[Path]:
     """Allocate agents across the multi-provider pool and persist to disk.
 
     Returns the path to the written JSON file, or None if the pool is not
     configured (in which case the simulation uses the single LLM_SIMULATION_*
     / LLM_* config as before).
+
+    `weights` optionally biases the distribution; see ProviderPool.allocate_agents.
     """
     pool = ProviderPool()
     if not pool:
@@ -63,6 +66,7 @@ def build_assignment(
         agent_ids=agent_ids,
         seed=seed,
         only_reachable=only_reachable,
+        weights=weights,
     )
 
     # Resolve each agent's provider entry to full config
@@ -83,6 +87,7 @@ def build_assignment(
         'created_at': datetime.utcnow().isoformat(),
         'pool': pool.names(),
         'only_reachable': only_reachable,
+        'weights': weights or None,
         'agent_count': len(detailed),
         'assignments': detailed,
     }

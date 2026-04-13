@@ -130,22 +130,23 @@ class ProviderPool:
         agent_ids: List[Any],
         seed: Optional[int] = None,
         only_reachable: bool = False,
+        weights: Optional[Dict[str, float]] = None,
     ) -> Dict[Any, str]:
         """Randomly assign each agent to a provider.
 
         Args:
-            agent_ids: list of agent identifiers (will be assigned)
+            agent_ids: list of agent identifiers
             seed: random seed for reproducibility (None = system random)
             only_reachable: if True, probe the pool first and skip unreachable providers
+            weights: optional {provider_name: float} distribution weights.
+                Missing/zero weights = never assigned. None = uniform.
 
         Returns:
             dict mapping agent_id -> provider name
 
-        Design note: assignment is uniform random, NOT role-based.
-        Rationale: uniform random breaks monoculture artefacts from all
-        agents sharing a single model. Role-based assignment is explicitly
-        rejected — it would require unjustified assumptions about which
-        models fit which social roles.
+        Weights exist for quota management only: users bias the distribution
+        so providers with larger daily budgets absorb more agents. Assignment
+        stays random (with replacement) within the weighted pool.
         """
         candidates = self.entries
         if only_reachable:
@@ -157,10 +158,21 @@ class ProviderPool:
             raise ValueError("No providers available for allocation")
 
         rng = random.Random(seed)
+
+        weight_vec = None
+        if weights:
+            weight_vec = [max(0.0, float(weights.get(e.name, 0.0))) for e in candidates]
+            if sum(weight_vec) <= 0:
+                weight_vec = None
+
         assignments: Dict[Any, str] = {}
-        for agent_id in agent_ids:
-            chosen = rng.choice(candidates)
-            assignments[agent_id] = chosen.name
+        if weight_vec is None:
+            for agent_id in agent_ids:
+                assignments[agent_id] = rng.choice(candidates).name
+        else:
+            picks = rng.choices(candidates, weights=weight_vec, k=len(agent_ids))
+            for agent_id, chosen in zip(agent_ids, picks):
+                assignments[agent_id] = chosen.name
         return assignments
 
     def to_public_dict(self) -> Dict[str, Any]:

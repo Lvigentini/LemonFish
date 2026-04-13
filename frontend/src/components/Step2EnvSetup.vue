@@ -77,30 +77,133 @@
             </div>
           </div>
 
+          <!-- Regenerate panel: entity-type filter + max cap + force regenerate -->
+          <div v-if="profiles.length > 0 && !isRegenerating" class="regenerate-panel">
+            <div class="regen-header">
+              <button
+                class="regen-toggle"
+                @click="regenPanelOpen = !regenPanelOpen"
+              >
+                <span class="regen-caret">{{ regenPanelOpen ? '▾' : '▸' }}</span>
+                Regenerate with different settings
+              </button>
+              <span v-if="regenPanelOpen" class="regen-hint">
+                Filter entity types, cap the agent count, and re-run profile + config generation.
+              </span>
+            </div>
+
+            <div v-if="regenPanelOpen" class="regen-body">
+              <div class="regen-types">
+                <div class="regen-label">Entity types</div>
+                <div v-if="availableEntityTypes.length === 0" class="regen-empty">
+                  Loading types…
+                </div>
+                <div v-else class="regen-type-grid">
+                  <label
+                    v-for="et in availableEntityTypes"
+                    :key="et.entity_type"
+                    class="regen-type-item"
+                  >
+                    <input
+                      type="checkbox"
+                      :value="et.entity_type"
+                      v-model="selectedEntityTypes"
+                    />
+                    <span class="regen-type-name">{{ et.entity_type }}</span>
+                    <span class="regen-type-count">×{{ et.count }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="regen-controls">
+                <label class="regen-cap">
+                  <span class="regen-label">Max agents</span>
+                  <input
+                    type="number"
+                    min="1"
+                    :max="effectiveMaxAgents"
+                    v-model.number="maxAgentsInput"
+                    placeholder="no cap"
+                  />
+                  <span class="regen-cap-hint">
+                    filtered = {{ filteredEntityCount }} • cap = {{ maxAgentsInput || '—' }}
+                  </span>
+                </label>
+
+                <div class="regen-actions">
+                  <button class="regen-btn secondary" @click="resetRegenForm">Reset</button>
+                  <button
+                    class="regen-btn primary"
+                    :disabled="filteredEntityCount === 0"
+                    @click="triggerRegenerate"
+                  >
+                    Regenerate profiles
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="isRegenerating" class="regen-status">
+            Regenerating profiles with {{ regenActiveCap ? `max ${regenActiveCap}` : 'no cap' }}…
+          </div>
+
           <!-- Profiles List Preview -->
           <div v-if="profiles.length > 0" class="profiles-preview">
             <div class="preview-header">
               <span class="preview-title">{{ $t('step2.generatedAgentPersonas') }}</span>
             </div>
             <div class="profiles-list">
-              <div 
-                v-for="(profile, idx) in profiles" 
-                :key="idx" 
+              <div
+                v-for="(profile, idx) in profiles"
+                :key="idx"
                 class="profile-card"
+                :class="{ 'is-org': isOrg(profile) }"
                 @click="selectProfile(profile)"
               >
                 <div class="profile-header">
                   <span class="profile-realname">{{ profile.username || 'Unknown' }}</span>
                   <span class="profile-username">@{{ profile.name || `agent_${idx}` }}</span>
+                  <span v-if="isOrg(profile)" class="profile-kind-pill org">ORG</span>
+                  <span v-else class="profile-kind-pill person">PERSON</span>
                 </div>
                 <div class="profile-meta">
-                  <span class="profile-profession">{{ profile.profession || $t('step2.unknownProfession') }}</span>
+                  <!-- Person: profession • age • locality -->
+                  <template v-if="!isOrg(profile)">
+                    <span class="profile-profession">{{ profile.profession || $t('step2.unknownProfession') }}</span>
+                    <span v-if="profile.age" class="profile-sep">•</span>
+                    <span v-if="profile.age" class="profile-age">{{ profile.age }}</span>
+                    <span v-if="profile.locality || profile.region" class="profile-sep">•</span>
+                    <span v-if="profile.locality || profile.region" class="profile-loc">
+                      {{ [profile.locality, profile.region].filter(Boolean).join(', ') }}
+                    </span>
+                  </template>
+                  <!-- Org: archetype • founded year • locality -->
+                  <template v-else>
+                    <span v-if="profile.org_archetype" class="profile-archetype">{{ profile.org_archetype }}</span>
+                    <span v-if="profile.founded_year" class="profile-sep">•</span>
+                    <span v-if="profile.founded_year" class="profile-founded">est. {{ profile.founded_year }}</span>
+                    <span v-if="profile.locality || profile.region" class="profile-sep">•</span>
+                    <span v-if="profile.locality || profile.region" class="profile-loc">
+                      {{ [profile.locality, profile.region].filter(Boolean).join(', ') }}
+                    </span>
+                  </template>
                 </div>
                 <p class="profile-bio">{{ profile.bio || $t('step2.noBio') }}</p>
+
+                <div class="profile-badges">
+                  <span v-if="profile.scope" class="badge-scope" :class="`scope-${profile.scope}`">
+                    {{ profile.scope }}
+                  </span>
+                  <span v-if="!isOrg(profile) && profile.disposable_income_level" class="badge-income" :class="`income-${profile.disposable_income_level}`">
+                    💰 {{ profile.disposable_income_level }}
+                  </span>
+                </div>
+
                 <div v-if="profile.interested_topics?.length" class="profile-topics">
-                  <span 
-                    v-for="topic in profile.interested_topics.slice(0, 3)" 
-                    :key="topic" 
+                  <span
+                    v-for="topic in profile.interested_topics.slice(0, 3)"
+                    :key="topic"
                     class="topic-tag"
                   >{{ topic }}</span>
                   <span v-if="profile.interested_topics.length > 3" class="topic-more">
@@ -544,69 +647,155 @@
         </div>
         
         <div class="modal-body">
-          <!-- basicinfo -->
-          <div class="modal-info-grid">
-            <div class="info-item">
-              <span class="info-label">{{ $t('step2.profileModalAge') }}</span>
-              <span class="info-value">{{ selectedProfile.age || '-' }} {{ $t('step2.yearsOld') }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">{{ $t('step2.profileModalGender') }}</span>
-              <span class="info-value">{{ { male: $t('step2.genderMale'), female: $t('step2.genderFemale'), other: $t('step2.genderOther') }[selectedProfile.gender] || selectedProfile.gender }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">{{ $t('step2.profileModalCountry') }}</span>
-              <span class="info-value">{{ selectedProfile.country || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">{{ $t('step2.profileModalMbti') }}</span>
-              <span class="info-value mbti">{{ selectedProfile.mbti || '-' }}</span>
-            </div>
+          <!-- Identity badges at top -->
+          <div class="modal-badges-row">
+            <span class="modal-kind-pill" :class="isOrg(selectedProfile) ? 'org' : 'person'">
+              {{ isOrg(selectedProfile) ? 'ORGANISATION' : 'PERSON' }}
+            </span>
+            <span v-if="selectedProfile.scope" class="badge-scope" :class="`scope-${selectedProfile.scope}`">
+              {{ selectedProfile.scope }}
+            </span>
+            <span v-if="!isOrg(selectedProfile) && selectedProfile.disposable_income_level" class="badge-income" :class="`income-${selectedProfile.disposable_income_level}`">
+              💰 {{ selectedProfile.disposable_income_level }}
+            </span>
+            <span v-if="isOrg(selectedProfile) && selectedProfile.org_archetype" class="badge-archetype">
+              {{ selectedProfile.org_archetype }}
+            </span>
           </div>
 
-          <!-- 简介 -->
+          <!-- Quick facts grid — different for person vs org -->
+          <div class="modal-info-grid">
+            <!-- Person -->
+            <template v-if="!isOrg(selectedProfile)">
+              <div class="info-item">
+                <span class="info-label">Age</span>
+                <span class="info-value">{{ selectedProfile.age || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Gender</span>
+                <span class="info-value">{{ { male: 'Male', female: 'Female', other: 'Other' }[selectedProfile.gender] || selectedProfile.gender || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Profession</span>
+                <span class="info-value">{{ selectedProfile.profession || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Location</span>
+                <span class="info-value">{{ [selectedProfile.locality, selectedProfile.region, selectedProfile.country].filter(Boolean).join(', ') || '—' }}</span>
+              </div>
+            </template>
+            <!-- Org -->
+            <template v-else>
+              <div class="info-item">
+                <span class="info-label">Archetype</span>
+                <span class="info-value">{{ selectedProfile.org_archetype || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Founded</span>
+                <span class="info-value">{{ selectedProfile.founded_year || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Function</span>
+                <span class="info-value">{{ selectedProfile.profession || selectedProfile.entity_type || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Location</span>
+                <span class="info-value">{{ [selectedProfile.locality, selectedProfile.region, selectedProfile.country].filter(Boolean).join(', ') || '—' }}</span>
+              </div>
+            </template>
+          </div>
+
+          <!-- Bio -->
           <div class="modal-section">
-            <span class="section-label">{{ $t('step2.profileModalBio') }}</span>
+            <span class="section-label">Bio</span>
             <p class="section-bio">{{ selectedProfile.bio || $t('step2.noBio') }}</p>
           </div>
 
-          <!-- followtopic -->
+          <!-- Topics -->
           <div class="modal-section" v-if="selectedProfile.interested_topics?.length">
-            <span class="section-label">{{ $t('step2.profileModalTopics') }}</span>
+            <span class="section-label">Interest topics</span>
             <div class="topics-grid">
-              <span 
-                v-for="topic in selectedProfile.interested_topics" 
-                :key="topic" 
+              <span
+                v-for="topic in selectedProfile.interested_topics"
+                :key="topic"
                 class="topic-item"
               >{{ topic }}</span>
             </div>
           </div>
 
-          <!-- detailedpersona -->
-          <div class="modal-section" v-if="selectedProfile.persona">
-            <span class="section-label">{{ $t('step2.profileModalPersona') }}</span>
-            
-            <!-- 人设维度概览 -->
-            <div class="persona-dimensions">
-              <div class="dimension-card">
-                <span class="dim-title">{{ $t('step2.personaDimExperience') }}</span>
-                <span class="dim-desc">{{ $t('step2.personaDimExperienceDesc') }}</span>
+          <!-- Accordion: Personality (Big Five for people, org traits for orgs) -->
+          <div class="modal-accordion" v-if="hasPersonalityData(selectedProfile)">
+            <button class="accordion-head" @click="toggleAcc('personality')">
+              <span class="acc-caret">{{ accOpen.has('personality') ? '▾' : '▸' }}</span>
+              Personality
+            </button>
+            <div v-if="accOpen.has('personality')" class="accordion-body">
+              <!-- Big Five bars -->
+              <div v-if="!isOrg(selectedProfile) && selectedProfile.big_five" class="trait-bars">
+                <div v-for="(score, dim) in selectedProfile.big_five" :key="dim" class="trait-row">
+                  <span class="trait-name">{{ dim }}</span>
+                  <div class="trait-bar"><div class="trait-fill" :style="{ width: score + '%' }"></div></div>
+                  <span class="trait-score">{{ score }}</span>
+                </div>
               </div>
-              <div class="dimension-card">
-                <span class="dim-title">{{ $t('step2.personaDimBehavior') }}</span>
-                <span class="dim-desc">{{ $t('step2.personaDimBehaviorDesc') }}</span>
-              </div>
-              <div class="dimension-card">
-                <span class="dim-title">{{ $t('step2.personaDimMemory') }}</span>
-                <span class="dim-desc">{{ $t('step2.personaDimMemoryDesc') }}</span>
-              </div>
-              <div class="dimension-card">
-                <span class="dim-title">{{ $t('step2.personaDimSocial') }}</span>
-                <span class="dim-desc">{{ $t('step2.personaDimSocialDesc') }}</span>
+              <!-- Org trait bars -->
+              <div v-else-if="isOrg(selectedProfile) && selectedProfile.org_traits" class="trait-bars">
+                <div v-for="(score, dim) in selectedProfile.org_traits" :key="dim" class="trait-row">
+                  <span class="trait-name">{{ dim.replace('_', ' ') }}</span>
+                  <div class="trait-bar"><div class="trait-fill" :style="{ width: score + '%' }"></div></div>
+                  <span class="trait-score">{{ score }}</span>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div class="persona-content">
+          <!-- Accordion: Background (cultural/location detail + social metrics) -->
+          <div class="modal-accordion">
+            <button class="accordion-head" @click="toggleAcc('background')">
+              <span class="acc-caret">{{ accOpen.has('background') ? '▾' : '▸' }}</span>
+              Background & context
+            </button>
+            <div v-if="accOpen.has('background')" class="accordion-body">
+              <div class="kv-grid">
+                <template v-if="selectedProfile.cultural_background">
+                  <div class="kv-label">Cultural background</div>
+                  <div class="kv-value">{{ selectedProfile.cultural_background }}</div>
+                </template>
+                <template v-if="selectedProfile.country">
+                  <div class="kv-label">Country</div>
+                  <div class="kv-value">{{ selectedProfile.country }}</div>
+                </template>
+                <template v-if="selectedProfile.region">
+                  <div class="kv-label">Region</div>
+                  <div class="kv-value">{{ selectedProfile.region }}</div>
+                </template>
+                <template v-if="selectedProfile.locality">
+                  <div class="kv-label">Locality</div>
+                  <div class="kv-value">{{ selectedProfile.locality }}</div>
+                </template>
+                <template v-if="selectedProfile.karma">
+                  <div class="kv-label">Karma (Reddit)</div>
+                  <div class="kv-value">{{ selectedProfile.karma }}</div>
+                </template>
+                <template v-if="selectedProfile.follower_count">
+                  <div class="kv-label">Followers (Twitter)</div>
+                  <div class="kv-value">{{ selectedProfile.follower_count }}</div>
+                </template>
+                <template v-if="selectedProfile.entity_type">
+                  <div class="kv-label">Source entity type</div>
+                  <div class="kv-value">{{ selectedProfile.entity_type }}</div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Accordion: Full persona prose -->
+          <div class="modal-accordion" v-if="selectedProfile.persona">
+            <button class="accordion-head" @click="toggleAcc('persona')">
+              <span class="acc-caret">{{ accOpen.has('persona') ? '▾' : '▸' }}</span>
+              Full persona
+            </button>
+            <div v-if="accOpen.has('persona')" class="accordion-body">
               <p class="section-persona">{{ selectedProfile.persona }}</p>
             </div>
           </div>
@@ -651,7 +840,8 @@ import {
   getPrepareStatus,
   getSimulationProfilesRealtime,
   getSimulationConfig,
-  getSimulationConfigRealtime
+  getSimulationConfigRealtime,
+  getSimulationEntityTypes
 } from '../api/simulation'
 import PreflightModal from './PreflightModal.vue'
 
@@ -687,6 +877,118 @@ let lastLoggedConfigStage = ''
 // simulationround countconfig
 const useCustomRounds = ref(false) // defaultuseautoconfiground count
 const customMaxRounds = ref(40)   // 默认推荐40轮
+
+// Regenerate panel state
+const regenPanelOpen = ref(false)
+const availableEntityTypes = ref([])  // [{entity_type, count}]
+const selectedEntityTypes = ref([])   // user-picked subset
+const maxAgentsInput = ref(null)      // numeric cap; null = no cap
+const isRegenerating = ref(false)
+const regenActiveCap = ref(null)
+
+// Accordion state for the profile detail modal
+const accOpen = ref(new Set(['personality']))
+const toggleAcc = (key) => {
+  const next = new Set(accOpen.value)
+  if (next.has(key)) next.delete(key); else next.add(key)
+  accOpen.value = next
+}
+
+// Person vs org discrimination.
+// Order of precedence:
+//   1. Structured personality data is the most reliable signal: big_five ⇒ person,
+//      org_archetype/org_traits ⇒ org.
+//   2. If neither is set, check source entity_type against a list of institutional types.
+//   3. Final fallback: treat as person. We deliberately do NOT use gender === 'other'
+//      as a signal any more — ~2% of individuals legitimately carry that value.
+const ORG_ENTITY_TYPE_HINTS = [
+  'university', 'governmentagency', 'ngo', 'organization', 'organisation',
+  'mediaoutlet', 'socialmediaplatform', 'company', 'institution', 'group',
+  'community', 'party', 'council', 'association', 'club'
+]
+const isOrg = (p) => {
+  if (!p) return false
+  if (p.org_archetype || p.org_traits) return true
+  if (p.big_five) return false
+  const t = (p.entity_type || '').toLowerCase()
+  if (t && ORG_ENTITY_TYPE_HINTS.some(key => t.includes(key))) return true
+  return false
+}
+const hasPersonalityData = (p) => {
+  if (!p) return false
+  return !!(p.big_five || p.org_traits)
+}
+
+const filteredEntityCount = computed(() => {
+  if (!availableEntityTypes.value.length) return 0
+  if (!selectedEntityTypes.value.length) return 0
+  return availableEntityTypes.value
+    .filter(et => selectedEntityTypes.value.includes(et.entity_type))
+    .reduce((sum, et) => sum + et.count, 0)
+})
+
+const effectiveMaxAgents = computed(() => filteredEntityCount.value || 1000)
+
+const resetRegenForm = () => {
+  selectedEntityTypes.value = availableEntityTypes.value.map(et => et.entity_type)
+  maxAgentsInput.value = null
+}
+
+const loadEntityTypes = async () => {
+  if (!props.simulationId) return
+  try {
+    const res = await getSimulationEntityTypes(props.simulationId)
+    if (res.success && res.data) {
+      availableEntityTypes.value = res.data.entity_types || []
+      if (!selectedEntityTypes.value.length) {
+        selectedEntityTypes.value = availableEntityTypes.value.map(et => et.entity_type)
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load entity types:', err)
+  }
+}
+
+const triggerRegenerate = async () => {
+  if (!props.simulationId || filteredEntityCount.value === 0) return
+  isRegenerating.value = true
+  regenActiveCap.value = maxAgentsInput.value || null
+  phase.value = 1
+  // Clear the existing profiles so the stats-grid reflects the new run
+  profiles.value = []
+  expectedTotal.value = null
+  lastLoggedProfileCount = 0
+  lastLoggedConfigStage = ''
+  simulationConfig.value = null
+  addLog(`Regenerating profiles — types: ${selectedEntityTypes.value.join(', ')}; cap: ${maxAgentsInput.value || 'none'}`)
+  emit('update-status', 'processing')
+  try {
+    const res = await prepareSimulation({
+      simulation_id: props.simulationId,
+      entity_types: selectedEntityTypes.value,
+      max_agents: maxAgentsInput.value || null,
+      force_regenerate: true,
+      use_llm_for_profiles: true,
+      parallel_profile_count: 5,
+    })
+    if (res.success && res.data) {
+      taskId.value = res.data.task_id
+      if (res.data.expected_entities_count) {
+        expectedTotal.value = res.data.expected_entities_count
+      }
+      startPolling()
+      startProfilesPolling()
+    } else {
+      addLog('Regeneration failed: ' + (res.error || 'unknown'))
+      emit('update-status', 'error')
+    }
+  } catch (err) {
+    addLog('Regeneration error: ' + err.message)
+    emit('update-status', 'error')
+  } finally {
+    isRegenerating.value = false
+  }
+}
 
 // Watch stage to update phase
 watch(currentStage, (newStage) => {
@@ -927,6 +1229,8 @@ const pollPrepareStatus = async () => {
         stopPolling()
         stopProfilesPolling()
         await loadPreparedData()
+        // Fetch entity types for the regenerate panel (non-blocking)
+        loadEntityTypes()
       } else if (data.status === 'failed') {
         addLog(t('log.prepareFailedWithError', { error: data.error || t('common.unknownError') }))
         stopPolling()
@@ -2632,4 +2936,227 @@ onUnmounted(() => {
   transform: scale(0.95) translateY(10px);
   opacity: 0;
 }
+
+/* ============ Phase A/B/C: regenerate panel ============ */
+
+.regenerate-panel {
+  margin-top: 14px;
+  border: 1px solid #eeeeee;
+  border-radius: 8px;
+  background: #fafafa;
+  padding: 12px 14px;
+}
+.regen-header { display: flex; flex-direction: column; gap: 2px; }
+.regen-toggle {
+  background: none;
+  border: none;
+  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 0.86rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  text-align: left;
+}
+.regen-caret { color: #FF5722; font-size: 0.9rem; }
+.regen-hint { color: #777; font-size: 0.76rem; margin-left: 18px; }
+.regen-body { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
+.regen-label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #666; font-weight: 600; margin-bottom: 6px; }
+.regen-empty { color: #aaa; font-size: 0.82rem; font-style: italic; }
+.regen-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+.regen-type-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid #eeeeee;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.regen-type-item input[type=checkbox] { accent-color: #FF5722; }
+.regen-type-name { flex: 1; color: #1a1a1a; }
+.regen-type-count { color: #888; font-variant-numeric: tabular-nums; font-size: 0.78rem; }
+
+.regen-controls {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.regen-cap { display: flex; flex-direction: column; gap: 4px; }
+.regen-cap input[type=number] {
+  width: 120px;
+  padding: 6px 10px;
+  border: 1px solid #dddddd;
+  border-radius: 5px;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+.regen-cap-hint { color: #888; font-size: 0.74rem; font-variant-numeric: tabular-nums; }
+.regen-actions { display: flex; gap: 8px; }
+.regen-btn {
+  padding: 8px 16px;
+  border-radius: 5px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+.regen-btn.secondary { background: #ffffff; color: #333; border-color: #dddddd; }
+.regen-btn.secondary:hover { background: #f5f5f5; }
+.regen-btn.primary { background: #1a1a1a; color: #ffffff; }
+.regen-btn.primary:hover:not(:disabled) { background: #000000; }
+.regen-btn.primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.regen-status {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: #fff3e0;
+  border: 1px solid #ffd699;
+  border-radius: 6px;
+  color: #7a3e00;
+  font-size: 0.86rem;
+}
+
+/* ============ Card variants (person vs org) and badges ============ */
+
+.profile-card.is-org { border-left: 3px solid #8e44ad; }
+.profile-kind-pill {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-left: auto;
+}
+.profile-kind-pill.person { background: #e3f2fd; color: #1565c0; }
+.profile-kind-pill.org { background: #f3e5f5; color: #7b1fa2; }
+.profile-sep { color: #bbb; margin: 0 4px; }
+.profile-age, .profile-loc, .profile-archetype, .profile-founded { color: #666; font-size: 0.78rem; }
+.profile-archetype { text-transform: uppercase; font-weight: 600; color: #7b1fa2; letter-spacing: 0.04em; }
+
+.profile-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+.badge-scope {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-scope.scope-local { background: #e8f5e9; color: #2e7d32; }
+.badge-scope.scope-national { background: #fff3e0; color: #e65100; }
+.badge-scope.scope-international { background: #e1f5fe; color: #0277bd; }
+.badge-scope.scope-unknown { background: #eeeeee; color: #666; }
+
+.badge-income {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.badge-income.income-none { background: #ffebee; color: #c62828; }
+.badge-income.income-constrained { background: #fff8e1; color: #8a6100; }
+.badge-income.income-comfortable { background: #e8f5e9; color: #2e7d32; }
+.badge-income.income-abundant { background: #e1f5fe; color: #0277bd; }
+
+.badge-archetype {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+/* ============ Modal: badges row + accordion + trait bars ============ */
+
+.modal-badges-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.modal-kind-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.modal-kind-pill.person { background: #e3f2fd; color: #1565c0; }
+.modal-kind-pill.org { background: #f3e5f5; color: #7b1fa2; }
+
+.modal-accordion {
+  margin-top: 14px;
+  border: 1px solid #eeeeee;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.accordion-head {
+  width: 100%;
+  padding: 10px 14px;
+  background: #fafafa;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.accordion-head:hover { background: #f3f3f3; }
+.acc-caret { color: #FF5722; }
+.accordion-body { padding: 14px; background: #ffffff; }
+
+.trait-bars { display: flex; flex-direction: column; gap: 8px; }
+.trait-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 40px;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.82rem;
+}
+.trait-name { text-transform: capitalize; color: #555; }
+.trait-bar {
+  background: #f0f0f0;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+.trait-fill {
+  background: linear-gradient(90deg, #FF5722, #ff8a5c);
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.trait-score { text-align: right; font-weight: 600; color: #1a1a1a; font-variant-numeric: tabular-nums; }
+
+.kv-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 8px 14px;
+  font-size: 0.84rem;
+}
+.kv-label { color: #666; font-weight: 600; }
+.kv-value { color: #1a1a1a; }
 </style>

@@ -82,20 +82,31 @@ class OasisAgentProfile:
     follower_count: int = 150
     statuses_count: int = 500
 
-    # Demographic + legacy fields
+    # Demographic fields (individuals only except where noted)
     age: Optional[int] = None
     gender: Optional[str] = None
-    mbti: Optional[str] = None  # Legacy — kept for display, not used behaviorally
     country: Optional[str] = None
+    region: Optional[str] = None       # state/province/administrative region
+    locality: Optional[str] = None     # city / suburb / area — most granular
+    cultural_background: Optional[str] = None  # free text, e.g. "second-gen Lebanese-Australian"
     profession: Optional[str] = None
     interested_topics: List[str] = field(default_factory=list)
+
+    # Phase B: disposable-income enum (individuals). Drives spending/consumption behaviour.
+    # One of: none / constrained / comfortable / abundant
+    disposable_income_level: Optional[str] = None
+
+    # Phase D: scope — geographic relevance of this entity to the simulation.
+    # One of: local / national / international / unknown
+    scope: Optional[str] = None
 
     # Phase 7.16: Research-backed personality frameworks
     # Individuals: Big Five scores (0-100 each)
     big_five: Optional[Dict[str, int]] = None
-    # Institutions: archetype + behavioural traits
+    # Institutions: archetype + behavioural traits + founding year (replaces placeholder age)
     org_archetype: Optional[str] = None  # one of 8 defined archetypes
     org_traits: Optional[Dict[str, int]] = None  # 5 behavioural dimensions (0-100)
+    founded_year: Optional[int] = None   # institution founding year (nullable — only set when source material supports it)
 
     # Source traceability
     source_entity_uuid: Optional[str] = None
@@ -103,6 +114,44 @@ class OasisAgentProfile:
 
     created_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
     
+    def _common_fields(self) -> Dict[str, Any]:
+        """Demographic + research-backed + location fields shared across Reddit/Twitter output."""
+        d: Dict[str, Any] = {}
+        # Age is individual-only now; orgs use founded_year instead
+        if self.age is not None:
+            d["age"] = self.age
+        if self.gender:
+            d["gender"] = self.gender
+        if self.country:
+            d["country"] = self.country
+        if self.region:
+            d["region"] = self.region
+        if self.locality:
+            d["locality"] = self.locality
+        if self.cultural_background:
+            d["cultural_background"] = self.cultural_background
+        if self.profession:
+            d["profession"] = self.profession
+        if self.interested_topics:
+            d["interested_topics"] = self.interested_topics
+        if self.disposable_income_level:
+            d["disposable_income_level"] = self.disposable_income_level
+        if self.scope:
+            d["scope"] = self.scope
+        # Research-backed personality frameworks
+        if self.big_five:
+            d["big_five"] = self.big_five
+        if self.org_archetype:
+            d["org_archetype"] = self.org_archetype
+        if self.org_traits:
+            d["org_traits"] = self.org_traits
+        if self.founded_year is not None:
+            d["founded_year"] = self.founded_year
+        # Source traceability — needed by the frontend to decide person vs org layout
+        if self.source_entity_type:
+            d["entity_type"] = self.source_entity_type
+        return d
+
     def to_reddit_format(self) -> Dict[str, Any]:
         """Serialize to Reddit-platform format used by OASIS."""
         profile = {
@@ -114,31 +163,9 @@ class OasisAgentProfile:
             "karma": self.karma,
             "created_at": self.created_at,
         }
-
-        # Demographic + legacy fields
-        if self.age:
-            profile["age"] = self.age
-        if self.gender:
-            profile["gender"] = self.gender
-        if self.mbti:
-            profile["mbti"] = self.mbti
-        if self.country:
-            profile["country"] = self.country
-        if self.profession:
-            profile["profession"] = self.profession
-        if self.interested_topics:
-            profile["interested_topics"] = self.interested_topics
-
-        # Phase 7.16 research-backed fields
-        if self.big_five:
-            profile["big_five"] = self.big_five
-        if self.org_archetype:
-            profile["org_archetype"] = self.org_archetype
-        if self.org_traits:
-            profile["org_traits"] = self.org_traits
-
+        profile.update(self._common_fields())
         return profile
-    
+
     def to_twitter_format(self) -> Dict[str, Any]:
         """Serialize to Twitter-platform format used by OASIS."""
         profile = {
@@ -152,32 +179,11 @@ class OasisAgentProfile:
             "statuses_count": self.statuses_count,
             "created_at": self.created_at,
         }
-
-        if self.age:
-            profile["age"] = self.age
-        if self.gender:
-            profile["gender"] = self.gender
-        if self.mbti:
-            profile["mbti"] = self.mbti
-        if self.country:
-            profile["country"] = self.country
-        if self.profession:
-            profile["profession"] = self.profession
-        if self.interested_topics:
-            profile["interested_topics"] = self.interested_topics
-
-        # Phase 7.16 research-backed fields
-        if self.big_five:
-            profile["big_five"] = self.big_five
-        if self.org_archetype:
-            profile["org_archetype"] = self.org_archetype
-        if self.org_traits:
-            profile["org_traits"] = self.org_traits
-
+        profile.update(self._common_fields())
         return profile
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        """Full dict representation of the profile."""
+        """Full dict representation of the profile (used for debug / API responses)."""
         return {
             "user_id": self.user_id,
             "user_name": self.user_name,
@@ -190,13 +196,18 @@ class OasisAgentProfile:
             "statuses_count": self.statuses_count,
             "age": self.age,
             "gender": self.gender,
-            "mbti": self.mbti,
             "country": self.country,
+            "region": self.region,
+            "locality": self.locality,
+            "cultural_background": self.cultural_background,
             "profession": self.profession,
             "interested_topics": self.interested_topics,
+            "disposable_income_level": self.disposable_income_level,
+            "scope": self.scope,
             "big_five": self.big_five,
             "org_archetype": self.org_archetype,
             "org_traits": self.org_traits,
+            "founded_year": self.founded_year,
             "source_entity_uuid": self.source_entity_uuid,
             "source_entity_type": self.source_entity_type,
             "created_at": self.created_at,
@@ -354,6 +365,41 @@ class OasisProfileGenerator:
         else:
             full_persona = base_persona
 
+        # Phase B/D field extraction with light validation
+        def _clean_str(v):
+            if not isinstance(v, str):
+                return None
+            s = v.strip()
+            return s or None
+
+        def _clean_int(v):
+            try:
+                return int(v) if v is not None else None
+            except (TypeError, ValueError):
+                return None
+
+        disposable = _clean_str(profile_data.get("disposable_income_level"))
+        if disposable and disposable.lower() not in {"none", "constrained", "comfortable", "abundant"}:
+            disposable = None
+        else:
+            disposable = disposable.lower() if disposable else None
+
+        scope = _clean_str(profile_data.get("scope"))
+        if scope and scope.lower() not in {"local", "national", "international"}:
+            scope = None
+        else:
+            scope = scope.lower() if scope else None
+
+        # Institutions: strip age, force gender=other, read founded_year
+        if is_individual:
+            age_val = profile_data.get("age")
+            founded_year = None
+        else:
+            age_val = None
+            founded_year = _clean_int(profile_data.get("founded_year"))
+            if founded_year is not None and not (1500 <= founded_year <= 2100):
+                founded_year = None
+
         return OasisAgentProfile(
             user_id=user_id,
             user_name=user_name,
@@ -364,15 +410,20 @@ class OasisProfileGenerator:
             friend_count=profile_data.get("friend_count", random.randint(50, 500)),
             follower_count=profile_data.get("follower_count", random.randint(100, 1000)),
             statuses_count=profile_data.get("statuses_count", random.randint(100, 2000)),
-            age=profile_data.get("age"),
-            gender=profile_data.get("gender"),
-            mbti=profile_data.get("mbti"),  # Legacy field, kept for display
+            age=age_val,
+            gender=profile_data.get("gender") if is_individual else "other",
             country=profile_data.get("country"),
+            region=_clean_str(profile_data.get("region")),
+            locality=_clean_str(profile_data.get("locality")),
+            cultural_background=_clean_str(profile_data.get("cultural_background")),
             profession=profile_data.get("profession"),
             interested_topics=profile_data.get("interested_topics", []),
+            disposable_income_level=disposable if is_individual else None,
+            scope=scope,
             big_five=big_five,
             org_archetype=org_archetype,
             org_traits=org_traits,
+            founded_year=founded_year,
             source_entity_uuid=entity.uuid,
             source_entity_type=entity_type,
         )
@@ -808,38 +859,62 @@ Return JSON with the following fields:
 2. persona: 2000-character detailed persona as a single prose block, covering:
    - Basic info (age, profession, education, location)
    - Background (key events, relationship to the simulation topic, social ties)
+   - Economic circumstances (income level, financial pressures, what they can afford)
+   - Cultural/community identity (heritage, language, community ties)
    - Social media behaviour (posting frequency, content preferences, interaction style, language patterns)
    - Stances (attitudes toward the topic, what provokes or moves them)
    - Distinctive traits (catchphrases, unique experiences, hobbies)
    - Personal memories linked to the event (their prior actions and reactions)
 3. age: integer age
-4. gender: "male" or "female"
+4. gender: "male", "female", or (rarely) "other". Match the realistic gender distribution of the
+   population this entity comes from. Use "other" ONLY when the source material specifically
+   supports a non-binary / unspecified identity, and aim for roughly 2% of individuals overall —
+   consistent with international population data. Do NOT default to "other" as a safe choice.
 5. country: country name in English (e.g., "Australia", "China", "United Kingdom")
-6. profession: profession or role
-7. interested_topics: array of interest tags
+6. region: state/province/administrative region (e.g., "New South Wales", "California"). Fill when
+   the source material supports it; empty string if unknown.
+7. locality: city, suburb, or most granular place name (e.g., "Manly", "Oakland"). Fill when the
+   source material supports it; empty string if unknown. This matters most for local simulations.
+8. cultural_background: free-text note about heritage / community / cultural identity where the
+   source material supports it (e.g., "fourth-generation Riverina grazier", "second-generation
+   Lebanese-Australian"). Empty string when not relevant or not inferable.
+9. profession: profession or role
+10. interested_topics: array of interest tags
 
-8. **big_five**: object with 5 integer scores 0-100 based on the Big Five / Five Factor Model.
-   This is research-backed personality psychology — use the entity's background, statements,
-   and actions in the source material to ground each score. Include:
-   - openness (0=conventional, 100=curious/inventive)
-   - conscientiousness (0=spontaneous, 100=organised/disciplined)
-   - extraversion (0=reserved/introverted, 100=outgoing/assertive)
-   - agreeableness (0=skeptical/competitive, 100=cooperative/empathetic)
-   - neuroticism (0=emotionally stable, 100=emotionally reactive/anxious)
-   IMPORTANT: score each dimension independently and vary across agents. Do NOT give
-   every agent the same middle-of-the-road profile. An expert in a contested field
-   should score high in conscientiousness and low in agreeableness. A local community
-   organiser should score high in extraversion and agreeableness. Use the source
-   material to justify the numbers — reference the scores in the persona prose.
+11. **disposable_income_level**: one of "none", "constrained", "comfortable", "abundant".
+    This drives spending/consumption behaviour and is fundamental — an entity with no disposable
+    income behaves very differently from a comfortable one on any topic touching money, leisure,
+    or goods. Infer from profession, context, and any economic cues in the source material.
+    Reference it briefly in the persona prose so the agent "knows" its own financial pressure.
 
-9. mbti: optional MBTI type (legacy field, kept for display — pick any plausible 4-letter code)
+12. **scope**: one of "local", "national", "international" — the geographic relevance of this
+    entity to the simulation. Infer from the source material: a resident of a specific suburb is
+    "local", a national journalist is "national", a UN rapporteur is "international". Default to
+    "local" when the source is clearly local, "national" when unclear but clearly in-country, and
+    "international" only when the entity explicitly operates across borders.
+
+13. **big_five**: object with 5 integer scores 0-100 based on the Big Five / Five Factor Model.
+    This is research-backed personality psychology — use the entity's background, statements,
+    and actions in the source material to ground each score. Include:
+    - openness (0=conventional, 100=curious/inventive)
+    - conscientiousness (0=spontaneous, 100=organised/disciplined)
+    - extraversion (0=reserved/introverted, 100=outgoing/assertive)
+    - agreeableness (0=skeptical/competitive, 100=cooperative/empathetic)
+    - neuroticism (0=emotionally stable, 100=emotionally reactive/anxious)
+    IMPORTANT: score each dimension independently and vary across agents. Do NOT give
+    every agent the same middle-of-the-road profile. An expert in a contested field
+    should score high in conscientiousness and low in agreeableness. A local community
+    organiser should score high in extraversion and agreeableness. Use the source
+    material to justify the numbers — reference the scores in the persona prose.
 
 Rules:
 - All field values must be strings, numbers, or objects — no newlines inside strings.
 - persona must be a single coherent prose block (no line breaks).
-- Respond in the user's language for bio/persona text. Gender must be English "male"/"female".
-- Ensure the content is consistent with the entity information.
+- Respond in the user's language for bio/persona text. Gender must be one of the English strings
+  "male" / "female" / "other". Use "other" rarely (~2% of individuals) and only when source-supported.
 - big_five scores must be integers 0-100.
+- disposable_income_level, scope must be one of the listed enum values.
+- Do NOT output an mbti field — it has been removed.
 """
 
     def _build_group_persona_prompt(
@@ -874,44 +949,53 @@ Return JSON with the following fields:
 
 1. bio: 200-character official account bio, professional tone.
 2. persona: 2000-character detailed institutional persona as a single prose block, covering:
-   - Institutional basics (formal name, nature, founding, mandate)
+   - Institutional basics (formal name, nature, founding year if known, mandate)
    - Account positioning (target audience, core function)
    - Communication style (language register, common expressions, taboo topics)
    - Content patterns (content types, posting frequency, active hours)
    - Stances (official position on core topics, controversy handling)
    - Represented constituency, operational habits
    - Institutional memory linked to the event (prior actions and reactions)
-3. age: integer 30 (virtual age marker for institutions)
-4. gender: "other" (institutional accounts use "other")
-5. country: country name in English (e.g., "Australia")
-6. profession: functional description of the institution
-7. interested_topics: array of focus-area tags
+3. gender: "other" (institutional accounts use "other")
+4. country: country name in English (e.g., "Australia")
+5. region: state/province/administrative region if the source supports it, else empty string.
+6. locality: city / suburb / most granular place name where the org is based, if known.
+   Leave empty when the org is national/international in nature.
+7. profession: functional description of the institution
+8. interested_topics: array of focus-area tags
 
-8. **org_archetype**: choose ONE of the following 8 archetypes that best matches how this
-   institution presents on social media. The archetype should reflect communication style
-   and institutional voice, not formal organisational theory:
+9. **founded_year**: integer 4-digit year the institution was founded/established, ONLY when
+   the source material explicitly supports it. Return null (not a number) if unknown — do NOT
+   invent a year. This replaces the old placeholder "age" field for institutions.
+
+10. **scope**: one of "local", "national", "international" — the geographic reach of this
+    organisation. A local council is "local", a national broadcaster is "national",
+    an NGO operating across borders is "international". Infer from the source material.
+
+11. **org_archetype**: choose ONE of the following 8 archetypes that best matches how this
+    institution presents on social media. The archetype should reflect communication style
+    and institutional voice, not formal organisational theory:
 {archetype_options}
 
-9. **org_traits**: object with 5 integer scores 0-100 describing the institution's
-   public communication behaviour. Ground these in what the source material says about
-   how the institution actually communicates, not defaults:
-   - formality (0=casual/colloquial, 100=formal/press-release style)
-   - risk_tolerance (0=controversy-averse, 100=willing to take strong public stances)
-   - transparency (0=opaque/boilerplate, 100=open about processes and uncertainty)
-   - responsiveness (0=slow/scheduled, 100=real-time engagement)
-   - ideological_intensity (0=position-neutral, 100=strong repeated public stances)
-   IMPORTANT: vary scores across institutions. A scrappy NGO and a government ministry
-   must have clearly different profiles. Reference the traits in the persona prose.
-
-10. mbti: optional MBTI type (legacy field, kept for display — e.g., "ISTJ")
+12. **org_traits**: object with 5 integer scores 0-100 describing the institution's
+    public communication behaviour. Ground these in what the source material says about
+    how the institution actually communicates, not defaults:
+    - formality (0=casual/colloquial, 100=formal/press-release style)
+    - risk_tolerance (0=controversy-averse, 100=willing to take strong public stances)
+    - transparency (0=opaque/boilerplate, 100=open about processes and uncertainty)
+    - responsiveness (0=slow/scheduled, 100=real-time engagement)
+    - ideological_intensity (0=position-neutral, 100=strong repeated public stances)
+    IMPORTANT: vary scores across institutions. A scrappy NGO and a government ministry
+    must have clearly different profiles. Reference the traits in the persona prose.
 
 Rules:
-- All field values must be strings, numbers, or objects — no null values, no newlines in strings.
-- persona must be a single coherent prose block (no line breaks).
+- All field values must be strings, numbers, objects, or null (for founded_year only).
+- No newlines in strings; persona is a single prose block.
 - Respond in the user's language for bio/persona text. gender must be "other".
-- age must be integer 30.
+- Do NOT output age — use founded_year instead. Do NOT output an mbti field.
 - org_archetype must be one of the 8 lowercase values listed above.
-- org_traits must contain all 5 integer keys."""
+- org_traits must contain all 5 integer keys.
+- scope must be one of "local"/"national"/"international"."""
     
     def _generate_profile_rule_based(
         self,
@@ -929,16 +1013,22 @@ Rules:
         # so downstream code sees consistent field shapes whether the LLM
         # succeeded or the fallback was used.
 
+        # Common defaults for the fallback path. Phase B/D fields are left
+        # unset — the LLM path is where they're populated; the fallback
+        # produces the minimum viable profile.
+        _income_levels = ["constrained", "comfortable"]
+
         if entity_type_lower in ["student", "alumni"]:
             return {
                 "bio": f"{entity_type} with interests in academics and social issues.",
                 "persona": f"{entity_name} is a {entity_type.lower()} who is actively engaged in academic and social discussions. They enjoy sharing perspectives and connecting with peers.",
                 "age": random.randint(18, 30),
                 "gender": random.choice(["male", "female"]),
-                "mbti": random.choice(self.MBTI_TYPES),
                 "country": random.choice(self.COUNTRIES),
                 "profession": "Student",
                 "interested_topics": ["Education", "Social Issues", "Technology"],
+                "disposable_income_level": "constrained",
+                "scope": "local",
                 "big_five": random_big_five(),
             }
 
@@ -948,10 +1038,11 @@ Rules:
                 "persona": f"{entity_name} is a recognized {entity_type.lower()} who shares insights and opinions on important matters. They are known for their expertise and influence in public discourse.",
                 "age": random.randint(35, 60),
                 "gender": random.choice(["male", "female"]),
-                "mbti": random.choice(["ENTJ", "INTJ", "ENTP", "INTP"]),
                 "country": random.choice(self.COUNTRIES),
                 "profession": entity_attributes.get("occupation", "Expert"),
                 "interested_topics": ["Politics", "Economics", "Culture & Society"],
+                "disposable_income_level": "comfortable",
+                "scope": "national",
                 # Experts skew high on conscientiousness, lower on agreeableness
                 "big_five": {
                     'openness': random.randint(60, 85),
@@ -967,12 +1058,11 @@ Rules:
             return {
                 "bio": f"Official account for {entity_name}. News and updates.",
                 "persona": f"{entity_name} is a media entity that reports news and facilitates public discourse. The account shares timely updates and engages with the audience on current events.",
-                "age": 30,
                 "gender": "other",
-                "mbti": "ISTJ",  # Legacy
                 "country": random.choice(self.COUNTRIES),
                 "profession": "Media",
                 "interested_topics": ["General News", "Current Events", "Public Affairs"],
+                "scope": "national",
                 "org_archetype": archetype,
                 "org_traits": dict(ARCHETYPE_DEFAULT_TRAITS[archetype]),
             }
@@ -982,12 +1072,11 @@ Rules:
             return {
                 "bio": f"Official account of {entity_name}.",
                 "persona": f"{entity_name} is an institutional entity that communicates official positions, announcements, and engages with stakeholders on relevant matters.",
-                "age": 30,
                 "gender": "other",
-                "mbti": "ISTJ",  # Legacy
                 "country": random.choice(self.COUNTRIES),
                 "profession": entity_type,
                 "interested_topics": ["Public Policy", "Community", "Official Announcements"],
+                "scope": "national",
                 "org_archetype": archetype,
                 "org_traits": dict(ARCHETYPE_DEFAULT_TRAITS[archetype]),
             }
@@ -998,20 +1087,19 @@ Rules:
             result = {
                 "bio": entity_summary[:150] if entity_summary else f"{entity_type}: {entity_name}",
                 "persona": entity_summary or f"{entity_name} is a {entity_type.lower()} participating in social discussions.",
-                "age": random.randint(25, 50),
-                "gender": random.choice(["male", "female"]),
-                "mbti": random.choice(self.MBTI_TYPES),
                 "country": random.choice(self.COUNTRIES),
                 "profession": entity_type,
                 "interested_topics": ["General", "Social Issues"],
+                "scope": "local",
             }
             if is_individual:
+                result["age"] = random.randint(25, 50)
+                result["gender"] = random.choice(["male", "female"])
+                result["disposable_income_level"] = random.choice(_income_levels)
                 result["big_five"] = random_big_five()
             else:
                 archetype = archetype_for_entity_type(entity_type)
                 result["gender"] = "other"
-                result["age"] = 30
-                result["mbti"] = "ISTJ"
                 result["org_archetype"] = archetype
                 result["org_traits"] = dict(ARCHETYPE_DEFAULT_TRAITS[archetype])
             return result
@@ -1207,8 +1295,9 @@ Rules:
             f"{profile.persona}",
             f"",
             f"【基本属性】",
-            f"年龄: {profile.age} | 性别: {profile.gender} | MBTI: {profile.mbti}",
+            f"年龄: {profile.age} | 性别: {profile.gender} | scope: {profile.scope or '-'}",
             f"职业: {profile.profession} | 国家: {profile.country}",
+            f"location: {profile.locality or '-'} / {profile.region or '-'}",
             f"兴趣话题: {topics_str}",
             separator
         ]
@@ -1324,15 +1413,14 @@ Rules:
         使用与 to_reddit_format() 一致的格式，确保 OASIS 能正确读取。
         必须包含 user_id 字段，这是 OASIS agent_graph.get_agent() 匹配的关键！
         
-        requiredfield: 
+        requiredfield:
         - user_id: 用户ID（整数，用于匹配 initial_posts 中的 poster_agent_id）
         - username: username
         - name: showname
         - bio: 简介
         - persona: detailedpersona
-        - age: 年龄（整数）
+        - age: 年龄（整数, individuals only; defaulted for orgs at OASIS layer）
         - gender: "male", "female", or "other"
-        - mbti: MBTItype
         - country: 国家
         """
         data = []
@@ -1349,7 +1437,6 @@ Rules:
                 # OASIS required fields (always defaulted)
                 "age": profile.age if profile.age else 30,
                 "gender": self._normalize_gender(profile.gender),
-                "mbti": profile.mbti if profile.mbti else "ISTJ",
                 "country": profile.country if profile.country else "Australia",
             }
 
@@ -1359,6 +1446,18 @@ Rules:
             if profile.interested_topics:
                 item["interested_topics"] = profile.interested_topics
 
+            # Phase B/D fields (location, scope, disposable income)
+            if profile.region:
+                item["region"] = profile.region
+            if profile.locality:
+                item["locality"] = profile.locality
+            if profile.cultural_background:
+                item["cultural_background"] = profile.cultural_background
+            if profile.disposable_income_level:
+                item["disposable_income_level"] = profile.disposable_income_level
+            if profile.scope:
+                item["scope"] = profile.scope
+
             # Phase 7.16 research-backed fields
             if profile.big_five:
                 item["big_five"] = profile.big_five
@@ -1366,6 +1465,12 @@ Rules:
                 item["org_archetype"] = profile.org_archetype
             if profile.org_traits:
                 item["org_traits"] = profile.org_traits
+            if profile.founded_year is not None:
+                item["founded_year"] = profile.founded_year
+
+            # Surface entity_type so the frontend can differentiate person vs org layouts
+            if profile.source_entity_type:
+                item["entity_type"] = profile.source_entity_type
 
             data.append(item)
         

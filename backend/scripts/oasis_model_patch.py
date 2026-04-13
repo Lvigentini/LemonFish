@@ -110,17 +110,26 @@ def _make_reddit_wrapper(original):
                 # org archetype narrative appended by OasisProfileGenerator, so it
                 # reaches the agent via the existing user_profile injection path
                 # in oasis.social_platform.config.user.UserInfo.to_reddit_system_message.
-                # The mbti/age/gender/country fields below are legacy display
-                # fields that OASIS's built-in Reddit template also consumes —
-                # kept for compatibility.
+                #
+                # mbti is dropped from our LLM prompts and serialization, BUT
+                # OASIS 0.2.5's Reddit system-message template
+                # (oasis/social_platform/config/user.py:97) accesses
+                # self.profile['other_info']['mbti'] with a hard square-bracket
+                # lookup — KeyError would crash agent construction. We therefore:
+                #   (a) keep the key in the profile dict with the upstream
+                #       convention default "None" as a safety net, and
+                #   (b) monkey-patch UserInfo.to_reddit_system_message in
+                #       _install_user_info_patch() below to omit the MBTI clause
+                #       from the rendered system prompt.
+                # Either layer alone is sufficient; both together = belt-and-braces.
                 profile = {
                     'nodes': [],
                     'edges': [],
                     'other_info': {
                         'user_profile': agent_info[i]['persona'],
-                        'mbti': agent_info[i].get('mbti', 'ISTJ'),
                         'gender': agent_info[i].get('gender', 'other'),
                         'age': agent_info[i].get('age', 30),
+                        'mbti': 'None',  # safety-net default — see comment above
                         'country': agent_info[i].get('country', 'Australia'),
                     },
                 }
@@ -209,9 +218,81 @@ def _make_twitter_wrapper(original):
     return wrapped
 
 
+def _install_user_info_patch() -> None:
+    """Patch oasis.social_platform.config.user.UserInfo.to_reddit_system_message.
+
+    Strips the hardcoded MBTI clause from the Reddit agent system prompt while
+    keeping the rest of the demographic line intact. Defensive: uses .get() so
+    missing keys don't crash, and silently no-ops if the OASIS module layout
+    changes upstream. Safe to call multiple times.
+    """
+    try:
+        from oasis.social_platform.config.user import UserInfo
+    except ImportError:
+        print('[oasis_model_patch] oasis user.py not importable; skipping system-message patch', file=sys.stderr)
+        return
+
+    if getattr(UserInfo, '_mirofish_mbti_stripped', False):
+        return
+
+    def to_reddit_system_message(self) -> str:
+        # Re-implementation of OASIS 0.2.5 user.py:79 with two changes:
+        #  1. The MBTI clause is removed.
+        #  2. Demographic-key access uses .get() so missing keys don't crash.
+        # Behaviour is otherwise identical: the rich Big Five / org-archetype
+        # narrative arrives via other_info['user_profile'] (the persona string)
+        # exactly as before.
+        name_string = ""
+        description_string = ""
+        if self.name is not None:
+            name_string = f"Your name is {self.name}."
+        if self.profile is None:
+            description = name_string
+        elif "other_info" not in self.profile:
+            description = name_string
+        elif "user_profile" in self.profile["other_info"]:
+            other = self.profile["other_info"]
+            if other.get("user_profile") is not None:
+                user_profile = other["user_profile"]
+                description_string = f"Your have profile: {user_profile}."
+                description = f"{name_string}\n{description_string}"
+                gender = other.get("gender", "person")
+                age = other.get("age", "unknown")
+                country = other.get("country", "unknown")
+                description += (
+                    f" You are a {gender}, {age} years old, from {country}."
+                )
+            else:
+                description = name_string
+        else:
+            description = name_string
+
+        system_content = f"""
+# OBJECTIVE
+You're a Reddit user, and I'll present you with some tweets. After you see the tweets, choose some actions from the following functions.
+
+# SELF-DESCRIPTION
+Your actions should be consistent with your self-description and personality.
+{description}
+
+# RESPONSE METHOD
+Please perform actions by tool calling.
+"""
+        return system_content
+
+    UserInfo.to_reddit_system_message = to_reddit_system_message
+    UserInfo._mirofish_mbti_stripped = True
+    print('[oasis_model_patch] UserInfo.to_reddit_system_message patched (MBTI clause stripped)', file=sys.stderr)
+
+
 def install() -> None:
     """Install the per-agent model patch. Safe to call multiple times."""
     global _installed, _assignments
+
+    # The MBTI-stripping system-message patch is independent of multi-provider
+    # routing — install it unconditionally so that even single-provider runs
+    # benefit from the cleaner system prompt.
+    _install_user_info_patch()
 
     if _installed:
         return

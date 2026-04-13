@@ -357,6 +357,50 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
         return False, {"reason": f"读取状态文件失败: {str(e)}"}
 
 
+@simulation_bp.route('/entity-types/<simulation_id>', methods=['GET'])
+def get_simulation_entity_types(simulation_id: str):
+    """Return per-type entity counts for a simulation's source graph.
+
+    Used by the Step 2 "Filter & regenerate" panel so the user can
+    tick/untick entity types before re-running profile generation.
+    Cheap call — uses enrich_with_edges=False for speed.
+    """
+    try:
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+        if not state:
+            return jsonify({"success": False, "error": t('api.simulationNotFound', id=simulation_id)}), 404
+        if not state.graph_id:
+            return jsonify({"success": False, "error": "Simulation has no graph_id"}), 400
+
+        reader = ZepEntityReader()
+        filtered = reader.filter_defined_entities(
+            graph_id=state.graph_id,
+            defined_entity_types=None,  # all types
+            enrich_with_edges=False,
+        )
+
+        from collections import Counter
+        type_counts = Counter()
+        for e in filtered.entities:
+            type_counts[e.get_entity_type() or "Entity"] += 1
+
+        types = [
+            {"entity_type": k, "count": v}
+            for k, v in sorted(type_counts.items(), key=lambda x: (-x[1], x[0]))
+        ]
+        return jsonify({
+            "success": True,
+            "data": {
+                "total": filtered.filtered_count,
+                "entity_types": types,
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to get entity types: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @simulation_bp.route('/prepare', methods=['POST'])
 def prepare_simulation():
     """
@@ -468,6 +512,13 @@ def prepare_simulation():
         entity_types_list = data.get('entity_types')
         use_llm_for_profiles = data.get('use_llm_for_profiles', True)
         parallel_profile_count = data.get('parallel_profile_count', 5)
+        max_agents = data.get('max_agents')  # optional cap; trims entities after filtering
+        try:
+            max_agents = int(max_agents) if max_agents is not None else None
+            if max_agents is not None and max_agents <= 0:
+                max_agents = None
+        except (TypeError, ValueError):
+            max_agents = None
         
         # ========== 同步获取实体数量（在后台任务启动前） ==========
         # 这样前端在调用prepare后立即就能获取到预期Agent总数
@@ -480,10 +531,13 @@ def prepare_simulation():
                 defined_entity_types=entity_types_list,
                 enrich_with_edges=False  # 不获取边信息，加快速度
             )
+            preview_count = filtered_preview.filtered_count
+            if max_agents is not None and max_agents > 0:
+                preview_count = min(preview_count, max_agents)
             # 保存实体数量到状态（供前端立即获取）
-            state.entities_count = filtered_preview.filtered_count
+            state.entities_count = preview_count
             state.entity_types = list(filtered_preview.entity_types)
-            logger.info(f"预期实体数量: {filtered_preview.filtered_count}, 类型: {filtered_preview.entity_types}")
+            logger.info(f"预期实体数量: {preview_count}, 类型: {filtered_preview.entity_types}")
         except Exception as e:
             logger.warning(f"同步获取实体数量失败（将在后台任务中重试）: {e}")
             # 失败不影响后续流程，后台任务会重新获取
@@ -596,7 +650,8 @@ def prepare_simulation():
                     defined_entity_types=entity_types_list,
                     use_llm_for_profiles=use_llm_for_profiles,
                     progress_callback=progress_callback,
-                    parallel_profile_count=parallel_profile_count
+                    parallel_profile_count=parallel_profile_count,
+                    max_agents=max_agents,
                 )
                 
                 # taskcomplete
@@ -1514,6 +1569,7 @@ def start_simulation():
         max_rounds = data.get('max_rounds')  # optional: maxsimulationround count
         enable_graph_memory_update = data.get('enable_graph_memory_update', False)  # optional: whetherenablegraphmemoryupdate
         force = data.get('force', False)  # optional: strongrebuildnewbegin
+        provider_weights = data.get('provider_weights')  # optional multi-provider quota weights
 
         # validate max_rounds parameter
         if max_rounds is not None:
@@ -1617,7 +1673,8 @@ def start_simulation():
             platform=platform,
             max_rounds=max_rounds,
             enable_graph_memory_update=enable_graph_memory_update,
-            graph_id=graph_id
+            graph_id=graph_id,
+            provider_weights=provider_weights,
         )
         
         # updatesimulation status
@@ -2949,6 +3006,166 @@ def get_agent_assignment(simulation_id: str):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@simulation_bp.route('/preflight/allocation', methods=['POST'])
+def preflight_allocation():
+    """Project per-provider token consumption for a planned simulation.
+
+    Combines the token estimate, multi-provider pool, optional weights,
+    and last-24h consumption into a per-provider projection so the user
+    can see which provider will hit its daily budget before launching.
+
+    Request JSON:
+        agents, rounds, document_chars (required)
+        report_sections (optional, default 4)
+        weights: {provider_name: float} (optional — uniform if omitted)
+    """
+    try:
+        from ..services.token_estimator import estimate
+        from ..services.provider_pool import ProviderPool
+        from ..services.budget_tracker import get_daily_totals
+
+        data = request.get_json() or {}
+        agents = int(data.get('agents', 0))
+        rounds = int(data.get('rounds', 0))
+        document_chars = int(data.get('document_chars', 0))
+        report_sections = int(data.get('report_sections', 4))
+        weights_in = data.get('weights') or {}
+
+        if agents <= 0 or rounds <= 0:
+            return jsonify({
+                "success": False,
+                "error": "agents and rounds must be positive integers"
+            }), 400
+
+        pool = ProviderPool()
+        if not pool:
+            return jsonify({
+                "success": False,
+                "error": "Multi-provider pool not configured"
+            }), 400
+
+        est = estimate(
+            agents=agents,
+            rounds=rounds,
+            document_chars=document_chars,
+            report_sections=report_sections,
+        )
+        total_tokens = est['total']['tokens']
+
+        # Normalize weights: default uniform, coerce/clamp
+        raw_weights = {}
+        for e in pool.entries:
+            raw = weights_in.get(e.name, 1.0)
+            try:
+                raw = max(0.0, float(raw))
+            except (TypeError, ValueError):
+                raw = 0.0
+            raw_weights[e.name] = raw
+
+        total_raw = sum(raw_weights.values())
+        if total_raw <= 0:
+            for k in raw_weights:
+                raw_weights[k] = 1.0
+            total_raw = float(len(raw_weights))
+        normalized = {k: (v / total_raw) for k, v in raw_weights.items()}
+
+        # Integer agent count per provider using largest-remainder method
+        agent_counts = {}
+        fractional = {}
+        assigned_so_far = 0
+        for name, share in normalized.items():
+            exact = share * agents
+            base = int(exact)
+            agent_counts[name] = base
+            fractional[name] = exact - base
+            assigned_so_far += base
+        remainder = agents - assigned_so_far
+        leftover = sorted(
+            [n for n in fractional if normalized[n] > 0],
+            key=lambda n: fractional[n], reverse=True,
+        )
+        for i in range(remainder):
+            if not leftover:
+                break
+            agent_counts[leftover[i % len(leftover)]] += 1
+
+        # Last-24h consumption per provider
+        consumed_by_provider = {}
+        try:
+            daily = get_daily_totals()
+            for row in daily.get('per_endpoint', []):
+                pname = row.get('provider')
+                if pname:
+                    consumed_by_provider[pname] = (
+                        consumed_by_provider.get(pname, 0) + row.get('total_tokens', 0)
+                    )
+        except Exception as e:
+            logger.warning(f"Daily budget lookup failed in preflight: {e}")
+
+        providers_out = []
+        any_over = False
+        any_warn = False
+        for e in pool.entries:
+            share = normalized[e.name]
+            projected = int(round(total_tokens * share))
+            budget = e.daily_token_budget
+            consumed = int(consumed_by_provider.get(e.name, 0))
+
+            if budget is None or budget <= 0:
+                status = 'unbudgeted'
+                remaining = None
+                pct = None
+                overage = 0
+            else:
+                remaining = max(0, budget - consumed)
+                pct = round(100.0 * (consumed + projected) / budget, 1)
+                if projected > remaining:
+                    status = 'over'
+                    overage = projected - remaining
+                    any_over = True
+                elif pct >= 80:
+                    status = 'warn'
+                    overage = 0
+                    any_warn = True
+                else:
+                    status = 'ok'
+                    overage = 0
+
+            providers_out.append({
+                'name': e.name,
+                'model': e.model,
+                'weight': round(share, 4),
+                'weight_raw': round(raw_weights[e.name], 4),
+                'share_percent': round(share * 100, 1),
+                'assigned_agents': agent_counts.get(e.name, 0),
+                'projected_tokens': projected,
+                'daily_budget': budget,
+                'consumed_today': consumed,
+                'remaining': remaining,
+                'percent_of_budget': pct,
+                'status': status,
+                'overage': overage,
+            })
+
+        return jsonify({
+            "success": True,
+            "data": {
+                'total_projected_tokens': total_tokens,
+                'agents': agents,
+                'providers': providers_out,
+                'any_over': any_over,
+                'any_warn': any_warn,
+            }
+        })
+    except Exception as e:
+        logger.error(f"Preflight allocation failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 @simulation_bp.route('/providers/allocate', methods=['POST'])
 def allocate_providers():
     """Preview how agents would be randomly allocated across the pool.
@@ -2975,8 +3192,11 @@ def allocate_providers():
                 "error": "Multi-provider pool not configured"
             }), 400
 
+        weights = data.get('weights')  # optional {provider_name: float}
         agent_ids = list(range(agent_count))
-        assignments = pool.allocate_agents(agent_ids, seed=seed, only_reachable=only_reachable)
+        assignments = pool.allocate_agents(
+            agent_ids, seed=seed, only_reachable=only_reachable, weights=weights,
+        )
 
         # Summary: how many agents per provider
         from collections import Counter
