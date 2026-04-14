@@ -95,4 +95,31 @@ const appVersion = __APP_VERSION__
 .router-link-active {
   color: #fbbf24;
 }
+
+/* LanguageSwitcher is styled for light backgrounds by default — invert it
+   for the dark global header so the trigger and dropdown remain legible.
+   :deep() reaches through scoped styles without modifying the component. */
+.app-global-header :deep(.switcher-trigger) {
+  background: transparent;
+  color: #e8ecf1;
+  border-color: #2f343d;
+}
+.app-global-header :deep(.switcher-trigger:hover) {
+  border-color: #94a3b8;
+  color: #ffffff;
+}
+.app-global-header :deep(.switcher-dropdown) {
+  background: #161a22;
+  border-color: #2f343d;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.app-global-header :deep(.switcher-option) {
+  color: #e8ecf1;
+}
+.app-global-header :deep(.switcher-option:hover) {
+  background: #1e293b;
+}
+.app-global-header :deep(.switcher-option.active) {
+  color: #fbbf24;
+}
 </style>

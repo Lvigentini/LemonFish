@@ -124,9 +124,10 @@ async function refresh() {
   loading.value = true
   error.value = null
   try {
+    // Response interceptor unwraps to {success, data}; not {data: {success, data}}
     const res = await getSimDiagnostics(props.simulationId)
-    if (res.data.success) diag.value = res.data.data
-    else error.value = res.data.error
+    if (res.success) diag.value = res.data
+    else error.value = res.error
   } catch (e) {
     error.value = e.message
   } finally {

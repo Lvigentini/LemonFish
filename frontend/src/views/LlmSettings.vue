@@ -248,11 +248,16 @@ function healthTitle(name) {
   return h.reachable ? `OK (${h.latency_ms} ms)` : (h.error || 'unreachable')
 }
 
+// Note: the global response interceptor (api/index.js) already unwraps
+// axios responses to `response.data`, so `res` here is `{success, data}`,
+// not `{data: {success, data}}`. The interceptor also rejects on
+// `success === false`, so by the time we reach the assignment below the
+// payload is guaranteed valid.
 async function loadSteps() {
   try {
     const res = await getStepLlmConfigs()
-    if (res.data.success) stepData.value = res.data.data
-    else loadError.value = res.data.error
+    if (res.success) stepData.value = res.data
+    else loadError.value = res.error
   } catch (e) {
     loadError.value = e.message
   }
@@ -260,7 +265,7 @@ async function loadSteps() {
 async function loadPool() {
   try {
     const res = await getProviderPool()
-    if (res.data.success) pool.value = res.data.data
+    if (res.success) pool.value = res.data
   } catch (e) {
     // pool endpoint returns 400 when not configured — tolerate
     pool.value = { configured: false, size: 0, providers: [], message: e.message }
@@ -269,13 +274,13 @@ async function loadPool() {
 async function loadCaps() {
   try {
     const res = await getProviderCapabilities()
-    if (res.data.success) capabilities.value = res.data.data
+    if (res.success) capabilities.value = res.data
   } catch (e) { /* optional */ }
 }
 async function loadOllama() {
   try {
     const res = await getOllamaStatus()
-    if (res.data.success) ollama.value = res.data.data
+    if (res.success) ollama.value = res.data
   } catch (e) { /* optional */ }
 }
 
@@ -283,7 +288,7 @@ async function doProbeAll() {
   probing.value = true
   try {
     const res = await probeProviders()
-    if (res.data.success) probeResults.value = res.data.data.results
+    if (res.success) probeResults.value = res.data.results
   } catch (e) {
     loadError.value = e.message
   } finally {
@@ -299,12 +304,12 @@ async function doReload() {
   reloading.value = true
   try {
     const res = await reloadEnv()
-    if (res.data.success) {
-      pool.value = res.data.data.pool
+    if (res.success) {
+      pool.value = res.data.pool
       await loadSteps()
       await loadOllama()
     } else {
-      loadError.value = res.data.error
+      loadError.value = res.error
     }
   } catch (e) {
     loadError.value = e.message
