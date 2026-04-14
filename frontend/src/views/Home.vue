@@ -45,74 +45,85 @@
       </section>
 
       <!-- 下半部分：双栏布局 -->
-      <section class="dashboard-section">
-        <!-- 左栏：状态与步骤 -->
-        <div class="left-panel">
-          <div class="panel-header">
-            <span class="status-dot">■</span> {{ $t('home.systemStatus') }}
-          </div>
-          
-          <h2 class="section-title">{{ $t('home.systemReady') }}</h2>
-          <p class="section-desc">
-            {{ $t('home.systemReadyDesc') }}
-          </p>
-          
-          <!-- 数据指标卡片 -->
-          <div class="metrics-row">
-            <div class="metric-card">
-              <div class="metric-value">{{ $t('home.metricLowCost') }}</div>
-              <div class="metric-label">{{ $t('home.metricLowCostDesc') }}</div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-value">{{ $t('home.metricHighAvail') }}</div>
-              <div class="metric-label">{{ $t('home.metricHighAvailDesc') }}</div>
-            </div>
-          </div>
-
-          <!-- 项目模拟步骤介绍 (新增区域) -->
-          <div class="steps-container">
-            <div class="steps-header">
-               <span class="diamond-icon">◇</span> {{ $t('home.workflowSequence') }}
-            </div>
-            <div class="workflow-list">
-              <div class="workflow-item">
-                <span class="step-num">01</span>
-                <div class="step-info">
-                  <div class="step-title">{{ $t('home.step01Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step01Desc') }}</div>
-                </div>
-              </div>
-              <div class="workflow-item">
-                <span class="step-num">02</span>
-                <div class="step-info">
-                  <div class="step-title">{{ $t('home.step02Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step02Desc') }}</div>
-                </div>
-              </div>
-              <div class="workflow-item">
-                <span class="step-num">03</span>
-                <div class="step-info">
-                  <div class="step-title">{{ $t('home.step03Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step03Desc') }}</div>
-                </div>
-              </div>
-              <div class="workflow-item">
-                <span class="step-num">04</span>
-                <div class="step-info">
-                  <div class="step-title">{{ $t('home.step04Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step04Desc') }}</div>
-                </div>
-              </div>
-              <div class="workflow-item">
-                <span class="step-num">05</span>
-                <div class="step-info">
-                  <div class="step-title">{{ $t('home.step05Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step05Desc') }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
+      <!-- Resume previous session: above the tabs so it's actionable
+           regardless of which tab is currently selected -->
+      <section v-if="resumableSessions.length > 0" class="resume-section resume-section--top">
+        <div class="resume-header">
+          <span class="resume-diamond">◇</span>
+          <h3 class="resume-title">{{ $t('home.resumeTitle') }}</h3>
+          <span class="resume-count">
+            {{ resumableSessions.length }}
+            {{ resumableSessions.length === 1 ? $t('home.resumeOne') : $t('home.resumeMany') }}
+          </span>
         </div>
+        <div class="resume-list">
+          <button
+            v-for="sim in resumableSessions.slice(0, 4)"
+            :key="sim.simulation_id"
+            class="resume-card"
+            :class="`resume-stage-${getResumeStage(sim)}`"
+            @click="resumeSession(sim)"
+            :title="`Resume at ${getResumeTarget(sim)}`"
+          >
+            <div class="resume-card-head">
+              <span class="resume-stage-pill" :class="`pill-${getResumeStage(sim)}`">
+                {{ getResumeStage(sim).toUpperCase() }}
+              </span>
+              <span class="resume-card-id">{{ formatSimId(sim.simulation_id) }}</span>
+            </div>
+            <div class="resume-card-title">{{ truncate(sim.simulation_requirement, 70) || '(no requirement)' }}</div>
+            <div class="resume-card-meta">
+              <span>{{ sim.entities_count || 0 }} agents</span>
+              <span>·</span>
+              <span>{{ formatRelative(sim.updated_at || sim.created_at) }}</span>
+              <span class="resume-arrow">→ {{ getResumeTarget(sim) }}</span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- Tab bar: New project | History -->
+      <nav class="tab-bar" role="tablist">
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'new' }"
+          role="tab"
+          :aria-selected="activeTab === 'new'"
+          @click="setTab('new')"
+        >
+          <span class="tab-glyph">＋</span> {{ $t('home.tabNew') }}
+        </button>
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'history' }"
+          role="tab"
+          :aria-selected="activeTab === 'history'"
+          @click="setTab('history')"
+        >
+          <span class="tab-glyph">◇</span> {{ $t('home.tabHistory') }}
+          <span v-if="historyCount > 0" class="tab-count">{{ historyCount }}</span>
+        </button>
+      </nav>
+
+      <!-- New project tab -->
+      <section v-show="activeTab === 'new'" class="dashboard-section">
+        <!-- Workflow rail (15%): condensed 5-step legend with hover tooltip -->
+        <aside class="workflow-rail" :aria-label="$t('home.workflowSequence')">
+          <div class="rail-header">
+            <span class="diamond-icon">◇</span> {{ $t('home.workflowSequence') }}
+          </div>
+          <ol class="rail-steps">
+            <li
+              v-for="n in 5"
+              :key="n"
+              class="rail-step"
+              :title="$t('home.step0' + n + 'Desc')"
+            >
+              <span class="rail-num">0{{ n }}</span>
+              <span class="rail-label">{{ $t('home.stepShort0' + n) }}</span>
+            </li>
+          </ol>
+        </aside>
 
         <!-- Right panel: interactive console -->
         <div class="right-panel">
@@ -244,51 +255,10 @@
         </div>
       </section>
 
-      <!-- Resume previous session: compact banner, only renders when partials exist -->
-      <section v-if="resumableSessions.length > 0" class="resume-section">
-        <div class="resume-header">
-          <span class="resume-diamond">◇</span>
-          <h3 class="resume-title">Resume previous session</h3>
-          <span class="resume-count">
-            {{ resumableSessions.length }}
-            {{ resumableSessions.length === 1 ? 'unfinished sim' : 'unfinished sims' }}
-          </span>
-        </div>
-        <div class="resume-list">
-          <button
-            v-for="sim in resumableSessions.slice(0, 4)"
-            :key="sim.simulation_id"
-            class="resume-card"
-            :class="`resume-stage-${getResumeStage(sim)}`"
-            @click="resumeSession(sim)"
-            :title="`Resume at ${getResumeTarget(sim)}`"
-          >
-            <div class="resume-card-head">
-              <span class="resume-stage-pill" :class="`pill-${getResumeStage(sim)}`">
-                {{ getResumeStage(sim).toUpperCase() }}
-              </span>
-              <span class="resume-card-id">{{ formatSimId(sim.simulation_id) }}</span>
-            </div>
-            <div class="resume-card-title">{{ truncate(sim.simulation_requirement, 70) || '(no requirement)' }}</div>
-            <div class="resume-card-meta">
-              <span>{{ sim.entities_count || 0 }} agents</span>
-              <span>·</span>
-              <span>{{ formatRelative(sim.updated_at || sim.created_at) }}</span>
-              <span class="resume-arrow">→ {{ getResumeTarget(sim) }}</span>
-            </div>
-          </button>
-        </div>
-        <button
-          v-if="resumableSessions.length > 4"
-          class="resume-more"
-          @click="scrollToHistory"
-        >
-          + {{ resumableSessions.length - 4 }} more — see full history below
-        </button>
+      <!-- History tab -->
+      <section v-show="activeTab === 'history'" class="history-tab">
+        <HistoryDatabase ref="historyRef" />
       </section>
-
-      <!-- historyprojectdatabase -->
-      <HistoryDatabase ref="historyRef" />
     </div>
   </div>
 </template>
@@ -316,6 +286,25 @@ const appVersion = __APP_VERSION__
 // lines and both views need to own the semantic independently for now.
 const resumableSessions = ref([])
 const historyRef = ref(null)
+const historyCount = ref(0)
+
+// ============ Tab state ============
+// Persisted to localStorage so returning users land on whichever tab
+// they last used. Default is 'new' for first-time visits.
+const TAB_KEY = 'home-tab'
+const validTabs = ['new', 'history']
+const initialTab = (() => {
+  try {
+    const saved = localStorage.getItem(TAB_KEY)
+    return validTabs.includes(saved) ? saved : 'new'
+  } catch { return 'new' }
+})()
+const activeTab = ref(initialTab)
+const setTab = (t) => {
+  if (!validTabs.includes(t)) return
+  activeTab.value = t
+  try { localStorage.setItem(TAB_KEY, t) } catch { /* ignore */ }
+}
 
 const getResumeStage = (sim) => {
   if (!sim) return 'unknown'
@@ -379,15 +368,12 @@ const formatRelative = (iso) => {
   return new Date(iso).toLocaleDateString()
 }
 
-const scrollToHistory = () => {
-  const el = document.querySelector('.history-database')
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 
 const loadResumableSessions = async () => {
   try {
     const res = await getSimulationHistory(50)
     if (res?.success && Array.isArray(res.data)) {
+      historyCount.value = res.data.length
       // Sort by updated_at desc so the most recently touched partial is first
       const partials = res.data
         .filter(isResumable)
@@ -782,135 +768,178 @@ const startEntry = () => {
 }
 
 /* Dashboard 双栏布局 */
-.dashboard-section {
+/* ============================================================
+   v1.1.9 — tabbed home with thin workflow rail
+   Replaces the old 50/50 dashboard split. The hero stays as-is;
+   tabs sit between the hero and the content; the New project
+   tab uses a 15/85 column split so the console gets breathing
+   room while the workflow legend remains visible as a sidebar.
+   ============================================================ */
+
+/* Tab bar */
+.tab-bar {
   display: flex;
-  gap: 60px;
+  gap: 8px;
   border-top: 1px solid var(--border);
-  padding-top: 60px;
-  align-items: flex-start;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+  margin-top: 40px;
 }
-
-.dashboard-section .left-panel,
-.dashboard-section .right-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-/* left panel */
-.left-panel {
-  flex: 0.8;
-}
-
-.panel-header {
+.tab-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 10px 22px;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: #999;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.status-dot {
-  color: var(--orange);
-  font-size: 0.8rem;
-}
-
-.section-title {
-  font-size: 2rem;
-  font-weight: 520;
-  margin: 0 0 15px 0;
-}
-
-.section-desc {
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
   color: var(--gray-text);
-  margin-bottom: 25px;
-  line-height: 1.6;
-}
-
-.metrics-row {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 15px;
-}
-
-.metric-card {
-  border: 1px solid var(--border);
-  padding: 20px 30px;
-  min-width: 150px;
-}
-
-.metric-value {
-  font-family: var(--font-mono);
-  font-size: 1.8rem;
-  font-weight: 520;
-  margin-bottom: 5px;
-}
-
-.metric-label {
-  font-size: 0.85rem;
-  color: #999;
-}
-
-/* 项目模拟步骤介绍 */
-.steps-container {
-  border: 1px solid var(--border);
-  padding: 30px;
-  position: relative;
-}
-
-.steps-header {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: #999;
-  margin-bottom: 25px;
-  display: flex;
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-
-.diamond-icon {
-  font-size: 1.2rem;
+.tab-btn:hover {
+  color: var(--black);
+  border-color: var(--black);
+}
+.tab-btn.active {
+  color: var(--black);
+  border-color: var(--black);
+  background: var(--black);
+  color: #ffffff;
+}
+.tab-glyph {
+  font-size: 1rem;
   line-height: 1;
 }
-
-.workflow-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.tab-count {
+  background: rgba(255,255,255,0.18);
+  color: inherit;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
 }
-
-.workflow-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-}
-
-.step-num {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: var(--black);
-  opacity: 0.3;
-}
-
-.step-info {
-  flex: 1;
-}
-
-.step-title {
-  font-weight: 520;
-  font-size: 1rem;
-  margin-bottom: 4px;
-}
-
-.step-desc {
-  font-size: 0.85rem;
+.tab-btn:not(.active) .tab-count {
+  background: var(--border);
   color: var(--gray-text);
 }
 
-/* 右侧交互控制台 */
+/* New project tab: 15% rail + 85% console */
+.dashboard-section {
+  display: flex;
+  gap: 32px;
+  padding-top: 40px;
+  align-items: flex-start;
+}
+
+/* Workflow rail — narrow vertical legend */
+.workflow-rail {
+  flex: 0 0 15%;
+  max-width: 200px;
+  min-width: 140px;
+  border: 1px solid var(--border);
+  padding: 18px 16px;
+  position: sticky;
+  top: 80px;
+}
+.rail-header {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: #999;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.diamond-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+.rail-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rail-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: default;
+  position: relative;
+}
+.rail-step + .rail-step::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: -14px;
+  height: 14px;
+  width: 1px;
+  background: var(--border);
+}
+.rail-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--black);
+  opacity: 0.32;
+  flex: 0 0 auto;
+  width: 22px;
+}
+.rail-label {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  color: var(--black);
+  text-transform: uppercase;
+}
+.rail-step:hover .rail-num { opacity: 0.7; }
+.rail-step:hover .rail-label { color: var(--orange); }
+
+/* Right panel: console grows into the freed space */
 .right-panel {
-  flex: 1.2;
+  flex: 1;
+  min-width: 0;
+}
+
+/* History tab wrapper — the existing HistoryDatabase styles handle internals */
+.history-tab {
+  padding-top: 32px;
+}
+
+/* Resume section — rendered above the tab bar */
+.resume-section--top {
+  margin-top: 40px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  background: rgba(255, 165, 0, 0.04);
+}
+
+/* Narrow viewports: collapse rail to a horizontal strip above the console */
+@media (max-width: 900px) {
+  .dashboard-section {
+    flex-direction: column;
+    gap: 20px;
+  }
+  .workflow-rail {
+    flex: 1 1 auto;
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+    position: static;
+  }
+  .rail-steps {
+    flex-direction: row;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .rail-step + .rail-step::before { display: none; }
 }
 
 .console-box {
@@ -1423,17 +1452,8 @@ html[lang="en"] .status-section .metric-value {
   font-size: 1.4rem;
 }
 
-html[lang="en"] .workflow-list .step-title {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-html[lang="en"] .workflow-list .step-desc {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-  font-size: 0.72rem !important;
-  line-height: 1.4 !important;
-}
-
-html[lang="en"] .workflow-list {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+html[lang="en"] .rail-label,
+html[lang="en"] .rail-num {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 </style>
