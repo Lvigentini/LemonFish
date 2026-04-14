@@ -6,30 +6,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MiroFish (LemonFish fork) is a multi-agent prediction and social simulation engine. It ingests domain documents, builds knowledge graphs via Zep Cloud, generates AI agent personas, simulates social dynamics on Twitter/Reddit using OASIS, and produces predictive forecast reports with agent interviews.
 
-## Development Commands
+## Runtime
+
+**This project runs in Docker in normal operation.** Always assume the Docker runtime when diagnosing, advising on URLs, or deciding how to pick up config changes. The `npm run dev` path below is contributor-mode only.
 
 ```bash
-# Setup
-npm run setup:all          # Install frontend (npm) + backend (uv) deps
+# Day-to-day (Docker, slim image)
+docker compose -f docker-compose.slim.yml up -d          # start
+docker compose -f docker-compose.slim.yml restart        # pick up .env / code changes
+docker compose -f docker-compose.slim.yml logs -f        # tail logs
+docker compose -f docker-compose.slim.yml down           # stop
 
-# Development (runs both concurrently)
-npm run dev                # Frontend :3000 + Backend :5001
-
-# Individual services
+# Contributor-mode (host, no container)
+npm run setup:all          # install frontend (npm) + backend (uv) deps
+npm run dev                # Frontend :3000 + Backend :5001 concurrently
 npm run frontend           # Vite dev server on :3000 (proxies /api to :5001)
 npm run backend            # Flask dev server on :5001 (via uv run python run.py)
-
-# Build
 npm run build              # Vite production build of frontend
 
-# Docker (slim image, ~2-3GB vs original 14GB)
-docker-compose -f docker-compose.slim.yml up -d
-
-# Setup wizard (interactive, generates .env + builds Docker)
+# Interactive wizard — generates .env + builds the Docker image
 ./setup.sh
 ```
 
-Backend uses **uv** as the Python package manager (`backend/pyproject.toml`). Run backend commands with `cd backend && uv run <command>`.
+Backend uses **uv** as the Python package manager (`backend/pyproject.toml`). Run backend commands with `cd backend && uv run <command>` in contributor mode, or `docker compose exec mirofish uv run <command>` under Docker.
+
+### Docker specifics
+
+- **Compose file:** `docker-compose.slim.yml` (single `mirofish` service, slim image, ~2-3GB).
+- **Bind mounts:** `./backend/uploads:/app/backend/uploads` (sim state readable from both sides) and `./.env:/app/.env:ro` (so the "Reload .env" feature in the LLM settings screen can re-read the file without a container restart).
+- **.env loading:** compose `env_file: .env` injects variables at container start. The file is also bind-mounted so runtime reload works. Edits without reload → restart container to pick up.
+- **Networking to the host** (e.g. local Ollama): use `http://host.docker.internal:11434/v1`, never `localhost`. `host.docker.internal` is auto on macOS/Windows Docker Desktop and added via `extra_hosts` for Linux.
+- **Host-port access:** frontend `localhost:3000`, backend `localhost:5001` (both published by compose).
+- **PIDs** in `backend/uploads/simulations/*/run_state.json` are container-local, not host PIDs.
 
 ## Architecture
 

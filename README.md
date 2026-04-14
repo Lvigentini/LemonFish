@@ -136,6 +136,35 @@ LLM_GOOGLE_DAILY_TOKEN_BUDGET=1000000
 
 **Daily budget aggregation** at `GET /api/simulation/budget/daily` shows how much you've spent across all simulations in the last 24h against your per-provider caps.
 
+**Simulation diagnostics** — every sim exposes `GET /api/simulation/<sim_id>/diagnostics` which parses `simulation.log`, queries the Twitter/Reddit SQLite DBs for actual posts/comments/likes/follows, classifies LLM errors by type (rate_limit_exhausted, api_404, api_429, …), and returns an `is_reportable` flag plus a blocker reason. The report endpoint (`POST /api/report/generate`) uses this to refuse gracefully with HTTP 422 + structured diagnostics when a run produced too little activity, instead of letting the ReACT agent spin on an empty graph. The frontend displays a `SimDiagnostics` panel inline on the simulation page whenever report generation is refused, so rate-limit failures surface in the UI and not just in the log file.
+
+### Local Ollama
+
+Ollama drops straight into the pool via its OpenAI-compatible endpoint. Point at a local daemon and list the models you've pulled:
+
+```env
+LLM_PROVIDERS=gemini,openrouter,ollama
+
+LLM_OLLAMA_API_KEY=ollama              # placeholder — Ollama ignores it
+LLM_OLLAMA_BASE_URL=http://localhost:11434/v1
+LLM_OLLAMA_MODELS=qwen3:4b,llama3.2:3b  # plural = multi-model sub-allocation
+```
+
+Inside Docker replace `localhost` with `host.docker.internal` (macOS/Windows) or the host LAN IP (Linux). The **LLM settings screen** (see below) has a dedicated Ollama panel that hits `GET /api/tags` for a cheap availability check and flags any configured models that are not yet pulled.
+
+### LLM settings & health screen
+
+Navigate to **`/settings/llm`** (linked from the home page header) for a read-only view of:
+
+- Primary + per-step LLM configs (api keys redacted)
+- Full provider pool with sources, models, and daily budgets
+- One-click **Probe all providers** — tiny chat completion per provider, latency reported
+- **Ollama availability** — `/api/tags` probe with installed vs configured models and a "missing — run `ollama pull`" hint
+- Cached capability flags (JSON mode, tool calls, structured output) per (base_url, model)
+- Absolute path to the resolved `.env` file and a **Reload .env** button that re-reads it into the running backend without requiring a full restart
+
+The reload button is sufficient for provider/pool/key edits because those are looked up dynamically; a full `npm run backend` restart is only needed if startup code paths changed.
+
 For the canonical, weekly-verified provider catalogue see [`docs/llm_providers.md`](./docs/llm_providers.md).
 
 ---

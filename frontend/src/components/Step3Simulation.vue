@@ -103,6 +103,13 @@
       </div>
     </div>
 
+    <!-- Inline diagnostics panel — shown when the report endpoint
+         refuses with 422/insufficient_activity or when the user
+         explicitly requests a re-check. -->
+    <div v-if="reportBlocked && props.simulationId" class="diagnostics-wrap">
+      <SimDiagnostics :simulationId="props.simulationId" :autoLoad="true" />
+    </div>
+
     <!-- Main Content: Dual Timeline -->
     <div class="main-content-area" ref="scrollContainer">
       <!-- Timeline Header -->
@@ -296,6 +303,7 @@ import {
   getRunStatusDetail
 } from '../api/simulation'
 import { generateReport } from '../api/report'
+import SimDiagnostics from './SimDiagnostics.vue'
 
 const { t } = useI18n()
 
@@ -317,6 +325,8 @@ const router = useRouter()
 
 // State
 const isGeneratingReport = ref(false)
+const reportBlocked = ref(false)
+const reportDiagnostics = ref(null)
 const phase = ref(0) // 0: not started, 1: running, 2: completed
 const isStarting = ref(false)
 const isStopping = ref(false)
@@ -667,18 +677,20 @@ const handleNextStep = async () => {
   }
   
   isGeneratingReport.value = true
+  reportBlocked.value = false
+  reportDiagnostics.value = null
   addLog(t('log.startingReportGen'))
-  
+
   try {
     const res = await generateReport({
       simulation_id: props.simulationId,
       force_regenerate: true
     })
-    
+
     if (res.success && res.data) {
       const reportId = res.data.report_id
       addLog(t('log.reportGenTaskStarted', { reportId }))
-      
+
       // 跳转到报告页面
       router.push({ name: 'Report', params: { reportId } })
     } else {
@@ -686,7 +698,17 @@ const handleNextStep = async () => {
       isGeneratingReport.value = false
     }
   } catch (err) {
-    addLog(t('log.reportGenException', { error: err.message }))
+    // Backend returns 422 with structured diagnostics when the sim
+    // produced too little activity. Surface the panel inline instead
+    // of burying the reason in the log.
+    const resp = err?.response?.data
+    if (err?.response?.status === 422 && resp?.diagnostics) {
+      reportBlocked.value = true
+      reportDiagnostics.value = resp.diagnostics
+      addLog(t('log.reportBlocked', { reason: resp.error_code || 'insufficient_activity' }))
+    } else {
+      addLog(t('log.reportGenException', { error: err.message }))
+    }
     isGeneratingReport.value = false
   }
 }

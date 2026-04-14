@@ -25,6 +25,17 @@ LLM_MODEL_NAME=gpt-4o         # or qwen-plus, etc.
 ZEP_API_KEY=z_...              # from https://app.getzep.com/
 ```
 
+**Optional — local Ollama in the provider pool:**
+
+```env
+LLM_PROVIDERS=ollama           # or append to an existing list
+LLM_OLLAMA_API_KEY=ollama      # placeholder, ignored by Ollama
+LLM_OLLAMA_BASE_URL=http://host.docker.internal:11434/v1   # or http://localhost:11434/v1 on host
+LLM_OLLAMA_MODELS=qwen3:4b,llama3.2:3b
+```
+
+Visit **http://localhost:3000/settings/llm** after startup to see which providers are configured, probe availability, and verify that every configured Ollama model has been pulled locally. The screen also has a **Reload .env** button so you can edit the file and pick up changes without restarting the backend container.
+
 ### 2. Start
 
 ```bash

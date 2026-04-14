@@ -105,7 +105,22 @@ def generate_report():
                 "success": False,
                 "error": t('api.missingSimRequirement')
             }), 400
-        
+
+        # Insufficient-activity guard: refuse gracefully when the sim
+        # produced too little data for the ReACT agent to say anything
+        # meaningful. Without this the report task spins on an empty
+        # graph and the UI shows an opaque failure. force_regenerate
+        # does NOT bypass — re-running on empty data still returns empty.
+        from ..services.sim_diagnostics import collect as collect_diagnostics
+        diag = collect_diagnostics(simulation_id)
+        if not diag.is_reportable:
+            return jsonify({
+                "success": False,
+                "error_code": diag.blocker or 'insufficient_activity',
+                "error": t('api.reportInsufficientActivity'),
+                "diagnostics": diag.to_dict(),
+            }), 422
+
         # 提前生成 report_id，以便立即返回给前端
         import uuid
         report_id = f"report_{uuid.uuid4().hex[:12]}"

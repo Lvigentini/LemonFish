@@ -3284,3 +3284,228 @@ def allocate_providers():
             "success": False,
             "error": str(e)
         }), 500
+
+
+# ============== LLM Settings screen — read-only introspection ==============
+
+import time as _time
+from urllib.parse import urlparse as _urlparse
+
+_BACKEND_STARTED_AT = _time.time()
+_LAST_ENV_RELOAD_AT = None
+
+
+def _redact_key(key):
+    """Return a display-safe form of an API key: sk-...xxxx."""
+    if not key:
+        return None
+    if len(key) <= 8:
+        return "***"
+    return f"{key[:4]}...{key[-4:]}"
+
+
+@simulation_bp.route('/providers/steps', methods=['GET'])
+def get_step_llm_configs():
+    """Return the primary + per-step LLM configs with keys redacted.
+
+    Also returns the resolved .env path and backend start time so the UI
+    can show whether a reload is needed.
+    """
+    try:
+        steps = ['ontology', 'profiles', 'config', 'simulation', 'report']
+        primary = {
+            'step': 'primary',
+            'api_key': _redact_key(Config.LLM_API_KEY),
+            'base_url': Config.LLM_BASE_URL,
+            'model': Config.LLM_MODEL_NAME,
+        }
+        step_configs = [primary]
+        for s in steps:
+            cfg = Config.get_step_llm_config(s)
+            step_configs.append({
+                'step': s,
+                'api_key': _redact_key(cfg['api_key']),
+                'base_url': cfg['base_url'],
+                'model': cfg['model'],
+            })
+
+        env_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', '..', '..', '.env')
+        )
+        return jsonify({
+            "success": True,
+            "data": {
+                "steps": step_configs,
+                "fallback_models": Config.LLM_FALLBACK_MODELS,
+                "max_retries": Config.LLM_MAX_RETRIES,
+                "retry_base_delay": Config.LLM_RETRY_BASE_DELAY,
+                "env_path": env_path,
+                "env_exists": os.path.exists(env_path),
+                "backend_started_at": _BACKEND_STARTED_AT,
+                "last_env_reload_at": _LAST_ENV_RELOAD_AT,
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to get step LLM configs: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+def _is_ollama_base_url(base_url):
+    if not base_url:
+        return False
+    try:
+        p = _urlparse(base_url)
+        host = (p.hostname or '').lower()
+        port = p.port
+        if port == 11434:
+            return True
+        if 'ollama' in host:
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def _ollama_tags_url(base_url):
+    """Convert a pool base_url like http://host:11434/v1 to http://host:11434/api/tags."""
+    p = _urlparse(base_url)
+    netloc = p.netloc or p.path
+    scheme = p.scheme or 'http'
+    return f"{scheme}://{netloc}/api/tags"
+
+
+@simulation_bp.route('/providers/ollama/status', methods=['GET'])
+def get_ollama_status():
+    """Cheap availability probe for any Ollama provider in the pool.
+
+    Uses GET /api/tags (instant, no inference) instead of a chat completion.
+    For each Ollama entry, returns running flag, installed models, configured
+    models, and any configured models that are not yet pulled.
+    """
+    try:
+        import requests
+        from ..services.provider_pool import ProviderPool
+
+        pool = ProviderPool()
+        results = []
+        for entry in pool.entries:
+            if not _is_ollama_base_url(entry.base_url):
+                continue
+            url = _ollama_tags_url(entry.base_url)
+            record = {
+                'provider': entry.name,
+                'base_url': entry.base_url,
+                'tags_url': url,
+                'running': False,
+                'installed_models': [],
+                'configured_models': entry.model_ids(),
+                'missing': [],
+                'error': None,
+            }
+            try:
+                r = requests.get(url, timeout=2.0)
+                if r.status_code == 200:
+                    body = r.json() or {}
+                    installed = [m.get('name') for m in body.get('models', []) if m.get('name')]
+                    record['running'] = True
+                    record['installed_models'] = installed
+                    record['missing'] = [m for m in record['configured_models'] if m not in installed]
+                else:
+                    record['error'] = f"HTTP {r.status_code}"
+            except Exception as e:
+                record['error'] = f"{type(e).__name__}: {str(e)[:160]}"
+            results.append(record)
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "count": len(results),
+                "providers": results,
+            }
+        })
+    except Exception as e:
+        logger.error(f"Ollama status probe failed: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@simulation_bp.route('/providers/reload', methods=['POST'])
+def reload_env():
+    """Re-read .env into os.environ and refresh Config class attributes.
+
+    This is sufficient for the provider pool and per-step configs because
+    they call os.environ.get() at lookup time. Class-level attributes
+    evaluated at import time (LLM_API_KEY, LLM_MODEL_NAME, LLM_PROVIDERS,
+    etc.) are re-assigned here too so downstream call sites stay coherent.
+
+    Returns the resulting pool summary so the UI can update immediately.
+    """
+    global _LAST_ENV_RELOAD_AT
+    try:
+        from dotenv import load_dotenv
+        env_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', '..', '..', '.env')
+        )
+        if not os.path.exists(env_path):
+            return jsonify({
+                "success": False,
+                "error": f".env not found at {env_path}"
+            }), 404
+
+        load_dotenv(env_path, override=True)
+
+        # Refresh class-level Config attributes that were evaluated at import time.
+        Config.LLM_API_KEY = os.environ.get('LLM_API_KEY')
+        Config.LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
+        Config.LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-4o-mini')
+        Config.LLM_PROVIDERS = [
+            p.strip().lower() for p in os.environ.get('LLM_PROVIDERS', '').split(',') if p.strip()
+        ]
+        Config.LLM_FALLBACK_MODELS = [
+            m.strip() for m in os.environ.get('LLM_FALLBACK_MODELS', '').split(',') if m.strip()
+        ]
+        Config.LLM_MAX_RETRIES = int(os.environ.get('LLM_MAX_RETRIES', '3'))
+        Config.LLM_RETRY_BASE_DELAY = float(os.environ.get('LLM_RETRY_BASE_DELAY', '2.0'))
+        Config.ZEP_API_KEY = os.environ.get('ZEP_API_KEY')
+
+        _LAST_ENV_RELOAD_AT = _time.time()
+
+        from ..services.provider_pool import get_pool_summary
+        return jsonify({
+            "success": True,
+            "data": {
+                "env_path": env_path,
+                "reloaded_at": _LAST_ENV_RELOAD_AT,
+                "pool": get_pool_summary(),
+            }
+        })
+    except Exception as e:
+        logger.error(f".env reload failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }), 500
+
+
+@simulation_bp.route('/<simulation_id>/diagnostics', methods=['GET'])
+def get_sim_diagnostics(simulation_id):
+    """Return activity + error diagnostics for a simulation.
+
+    Read-only. Parses simulation.log and queries the per-platform SQLite
+    DBs. Never raises — on missing data returns a zeroed diagnostics
+    object with blocker='missing_sim_dir'.
+    """
+    try:
+        from ..services.sim_diagnostics import collect
+        diag = collect(simulation_id)
+        return jsonify({
+            "success": True,
+            "data": diag.to_dict()
+        })
+    except Exception as e:
+        logger.error(f"Diagnostics collection failed for {simulation_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }), 500

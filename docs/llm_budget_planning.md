@@ -214,5 +214,9 @@ Users see these before clicking Start and can back off to a smaller scenario or 
 | `POST /api/simulation/providers/probe` | Live probe of every provider |
 | `POST /api/simulation/providers/allocate` | Preview an agent-to-provider allocation (seeded or random) |
 | `GET /api/simulation/providers/capabilities` | Cached capability detection results (JSON mode support, etc.) |
+| `GET /api/simulation/providers/steps` | Primary + per-step LLM configs (api keys redacted) — powers the LLM settings screen |
+| `GET /api/simulation/providers/ollama/status` | Cheap Ollama availability probe via `/api/tags`; reports running/installed/configured/missing models |
+| `POST /api/simulation/providers/reload` | Re-read `.env` into the running backend so provider/pool/key changes apply without a restart |
+| `GET /api/simulation/<sim_id>/diagnostics` | Activity + LLM-error summary for a completed/failed simulation; used by the report guard and the frontend `SimDiagnostics` panel |
 | `GET /api/simulation/assignment/<simulation_id>` | Agent-to-provider assignment for a running simulation (API keys redacted) |
 | `GET /api/simulation/budget/daily` | 24-hour consumption vs per-provider daily budgets |

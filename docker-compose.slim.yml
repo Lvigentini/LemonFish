@@ -12,3 +12,11 @@ services:
     restart: unless-stopped
     volumes:
       - ./backend/uploads:/app/backend/uploads
+      # Bind-mount .env so the LLM settings screen's "Reload .env" button
+      # can re-read it inside the container without a full restart.
+      - ./.env:/app/.env:ro
+    extra_hosts:
+      # Lets the container reach host-side services (e.g. local Ollama at
+      # http://host.docker.internal:11434) on Linux. Already auto on
+      # macOS/Windows Docker Desktop but harmless to declare explicitly.
+      - "host.docker.internal:host-gateway"

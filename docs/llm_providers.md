@@ -351,6 +351,35 @@ Kimi K2 (current) — from https://platform.kimi.com/docs/pricing/chat-k2:
 - Models below 7B produce incoherent personas — avoid
 - Best used to **supplement** API budget, not replace it
 
+### Wiring Ollama into the multi-provider pool
+
+Ollama speaks OpenAI-compatible JSON, so it plugs directly into `LLM_PROVIDERS`. Use the plural `LLM_OLLAMA_MODELS` env var to declare multiple local models — the pool will sub-allocate agents across them the same way it does for catalogue-backed providers like OpenRouter.
+
+```env
+LLM_PROVIDERS=gemini,openrouter,ollama
+
+LLM_OLLAMA_API_KEY=ollama              # placeholder, never sent to a network
+LLM_OLLAMA_BASE_URL=http://localhost:11434/v1
+LLM_OLLAMA_MODELS=qwen3:4b,llama3.2:3b
+# Or for single-model:
+# LLM_OLLAMA_MODEL=qwen3:4b
+```
+
+The pool loader requires `LLM_OLLAMA_API_KEY` to be non-empty (any string works), `LLM_OLLAMA_BASE_URL` to resolve to your Ollama daemon, and either the plural `LLM_OLLAMA_MODELS` or singular `LLM_OLLAMA_MODEL` to declare at least one model. Inside Docker replace `localhost` with `host.docker.internal` (macOS/Windows) or the host LAN IP (Linux).
+
+### Availability check (LLM settings screen)
+
+The read-only **`/settings/llm`** screen in the frontend includes an Ollama panel that runs a cheap availability probe against every pool entry whose base URL points at an Ollama daemon. Unlike the generic provider probe (which costs a real chat completion), this hits `GET http://<daemon>/api/tags` with a 2-second timeout, returning:
+
+- **running** — whether the daemon answered
+- **installed_models** — models Ollama actually has pulled
+- **configured_models** — what `LLM_OLLAMA_MODELS` currently lists
+- **missing** — configured models that are *not* yet pulled, with a `ollama pull <model>` hint
+
+The same screen exposes a **Reload .env** button so adding/removing Ollama models doesn't require restarting the Flask backend — the pool is rebuilt from the refreshed environment on the next request.
+
+The raw endpoint is `GET /api/simulation/providers/ollama/status` if you want to script it.
+
 ---
 
 ## Cost Estimator

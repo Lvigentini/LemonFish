@@ -265,3 +265,25 @@ export const getAgentAssignment = (simulationId) => {
   return service.get(`/api/simulation/assignment/${simulationId}`)
 }
 
+// ============== LLM settings screen ==============
+
+/** Get primary + per-step LLM configs with api keys redacted. */
+export const getStepLlmConfigs = () => {
+  return service.get('/api/simulation/providers/steps')
+}
+
+/** Cheap availability probe for Ollama providers (uses /api/tags). */
+export const getOllamaStatus = () => {
+  return service.get('/api/simulation/providers/ollama/status')
+}
+
+/** Re-read .env into the running backend process. */
+export const reloadEnv = () => {
+  return service.post('/api/simulation/providers/reload', {})
+}
+
+/** Activity + error diagnostics for a completed or failed simulation. */
+export const getSimDiagnostics = (simulationId) => {
+  return service.get(`/api/simulation/${simulationId}/diagnostics`)
+}
+

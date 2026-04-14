@@ -6,6 +6,7 @@ import SimulationRunView from '../views/SimulationRunView.vue'
 import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
 import Step0Research from '../views/Step0Research.vue'
+import LlmSettings from '../views/LlmSettings.vue'
 
 const routes = [
   {
@@ -47,6 +48,11 @@ const routes = [
     name: 'Interaction',
     component: InteractionView,
     props: true
+  },
+  {
+    path: '/settings/llm',
+    name: 'LlmSettings',
+    component: LlmSettings
   }
 ]
 
