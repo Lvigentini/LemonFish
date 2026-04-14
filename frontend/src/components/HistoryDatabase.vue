@@ -10,15 +10,70 @@
       <div class="gradient-overlay"></div>
     </div>
 
-    <!-- 标题区域 -->
-    <div class="section-header">
-      <div class="section-line"></div>
-      <span class="section-title">{{ $t('history.title') }}</span>
-      <div class="section-line"></div>
+    <!-- View toggle: card | list -->
+    <div class="view-toggle-row" v-if="projects.length > 0">
+      <span class="toggle-label">{{ $t('history.viewLabel') }}</span>
+      <div class="view-toggle">
+        <button
+          class="vt-btn"
+          :class="{ active: viewMode === 'card' }"
+          @click="setViewMode('card')"
+          :title="$t('history.viewCard')"
+        >
+          <span class="vt-icon">▦</span> {{ $t('history.viewCard') }}
+        </button>
+        <button
+          class="vt-btn"
+          :class="{ active: viewMode === 'list' }"
+          @click="setViewMode('list')"
+          :title="$t('history.viewList')"
+        >
+          <span class="vt-icon">≡</span> {{ $t('history.viewList') }}
+        </button>
+      </div>
     </div>
 
-    <!-- 卡片容器（只在有项目时显示） -->
-    <div v-if="projects.length > 0" class="cards-container" :class="{ expanded: isExpanded }" :style="containerStyle">
+    <!-- List view -->
+    <div v-if="projects.length > 0 && viewMode === 'list'" class="list-container">
+      <div class="list-header">
+        <span class="lh-status">{{ $t('history.colStatus') }}</span>
+        <span class="lh-title">{{ $t('history.colTitle') }}</span>
+        <span class="lh-meta">{{ $t('history.colAgents') }}</span>
+        <span class="lh-meta">{{ $t('history.colRounds') }}</span>
+        <span class="lh-meta">{{ $t('history.colDate') }}</span>
+        <span class="lh-actions"></span>
+      </div>
+      <div
+        v-for="project in projects"
+        :key="'list-' + project.simulation_id"
+        class="list-row"
+        @click="navigateToProject(project)"
+      >
+        <span class="lr-status">
+          <span class="lifecycle-pill" :class="`lifecycle-${getLifecycleStage(project)}`">
+            {{ getLifecycleLabel(project) }}
+          </span>
+        </span>
+        <span class="lr-title">
+          <span class="lr-title-main">{{ getSimulationTitle(project.simulation_requirement) }}</span>
+          <span class="lr-title-id">{{ formatSimulationId(project.simulation_id) }}</span>
+        </span>
+        <span class="lr-meta">{{ project.entities_count || project.profiles_count || 0 }}</span>
+        <span class="lr-meta">{{ formatRounds(project) }}</span>
+        <span class="lr-meta">{{ formatDate(project.created_at) }}</span>
+        <span class="lr-actions">
+          <button
+            v-if="isPartial(project)"
+            class="resume-quick-btn list-resume"
+            @click.stop="quickResume(project)"
+            :title="`Resume at ${getResumeTarget(project)}`"
+          >⤳ Resume</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- Card view (existing carousel) -->
+    <div v-if="projects.length > 0 && viewMode === 'card'" class="cards-container" :class="{ expanded: isExpanded }" :style="containerStyle">
       <div 
         v-for="(project, index) in projects" 
         :key="project.simulation_id"
@@ -227,6 +282,22 @@ const route = useRoute()
 const { t } = useI18n()
 
 // status
+// View mode for previous-sessions list. Persisted to localStorage so the
+// user's last choice survives reloads.
+const VIEW_KEY = 'history-view-mode'
+const validViews = ['card', 'list']
+const viewMode = ref((() => {
+  try {
+    const saved = localStorage.getItem(VIEW_KEY)
+    return validViews.includes(saved) ? saved : 'card'
+  } catch { return 'card' }
+})())
+const setViewMode = (m) => {
+  if (!validViews.includes(m)) return
+  viewMode.value = m
+  try { localStorage.setItem(VIEW_KEY, m) } catch { /* ignore */ }
+}
+
 const projects = ref([])
 const loading = ref(true)
 const isExpanded = ref(false)
@@ -1526,5 +1597,139 @@ onUnmounted(() => {
   letter-spacing: 0.3px;
   text-align: center;
   line-height: 1.5;
+}
+
+/* ============ View toggle (card | list) ============ */
+.view-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 0 4px;
+}
+.toggle-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  color: #9CA3AF;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.vt-btn {
+  background: #ffffff;
+  border: none;
+  padding: 6px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: #666;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-right: 1px solid #d4d4d4;
+  transition: background 0.15s, color 0.15s;
+}
+.vt-btn:last-child { border-right: none; }
+.vt-btn:hover { background: #f5f5f5; color: #1a1a1a; }
+.vt-btn.active { background: #1a1a1a; color: #ffffff; }
+.vt-icon { font-size: 0.95rem; line-height: 1; }
+
+/* ============ List view ============ */
+.list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffffff;
+}
+.list-header {
+  display: grid;
+  grid-template-columns: 110px 1fr 80px 100px 110px 100px;
+  gap: 14px;
+  padding: 10px 18px;
+  background: #f7f7f8;
+  border-bottom: 1px solid #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9CA3AF;
+}
+.lh-meta, .lh-status, .lh-title, .lh-actions { white-space: nowrap; }
+.list-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 80px 100px 110px 100px;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  align-items: center;
+  transition: background 0.12s;
+}
+.list-row:last-child { border-bottom: none; }
+.list-row:hover { background: #fafafa; }
+.lr-status .lifecycle-pill {
+  font-size: 0.65rem;
+}
+.lr-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lr-title-main {
+  font-size: 0.88rem;
+  color: #1a1a1a;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lr-title-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  color: #999;
+}
+.lr-meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: #555;
+  font-variant-numeric: tabular-nums;
+}
+.lr-actions { text-align: right; }
+.list-resume {
+  background: #fff3e0;
+  color: #b25a00;
+  border: 1px solid #ffd9a8;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.list-resume:hover {
+  background: #ffe9c8;
+  border-color: #ffb060;
+}
+
+/* Narrow viewports: collapse to fewer columns */
+@media (max-width: 900px) {
+  .list-header,
+  .list-row {
+    grid-template-columns: 90px 1fr 90px 80px;
+  }
+  .list-header > :nth-child(4),
+  .list-header > :nth-child(6),
+  .list-row > :nth-child(4),
+  .list-row > :nth-child(6) {
+    display: none;
+  }
 }
 </style>

@@ -45,44 +45,7 @@
       </section>
 
       <!-- 下半部分：双栏布局 -->
-      <!-- Resume previous session: above the tabs so it's actionable
-           regardless of which tab is currently selected -->
-      <section v-if="resumableSessions.length > 0" class="resume-section resume-section--top">
-        <div class="resume-header">
-          <span class="resume-diamond">◇</span>
-          <h3 class="resume-title">{{ $t('home.resumeTitle') }}</h3>
-          <span class="resume-count">
-            {{ resumableSessions.length }}
-            {{ resumableSessions.length === 1 ? $t('home.resumeOne') : $t('home.resumeMany') }}
-          </span>
-        </div>
-        <div class="resume-list">
-          <button
-            v-for="sim in resumableSessions.slice(0, 4)"
-            :key="sim.simulation_id"
-            class="resume-card"
-            :class="`resume-stage-${getResumeStage(sim)}`"
-            @click="resumeSession(sim)"
-            :title="`Resume at ${getResumeTarget(sim)}`"
-          >
-            <div class="resume-card-head">
-              <span class="resume-stage-pill" :class="`pill-${getResumeStage(sim)}`">
-                {{ getResumeStage(sim).toUpperCase() }}
-              </span>
-              <span class="resume-card-id">{{ formatSimId(sim.simulation_id) }}</span>
-            </div>
-            <div class="resume-card-title">{{ truncate(sim.simulation_requirement, 70) || '(no requirement)' }}</div>
-            <div class="resume-card-meta">
-              <span>{{ sim.entities_count || 0 }} agents</span>
-              <span>·</span>
-              <span>{{ formatRelative(sim.updated_at || sim.created_at) }}</span>
-              <span class="resume-arrow">→ {{ getResumeTarget(sim) }}</span>
-            </div>
-          </button>
-        </div>
-      </section>
-
-      <!-- Tab bar: New project | History -->
+      <!-- Tab bar: New project | Previous sessions -->
       <nav class="tab-bar" role="tablist">
         <button
           class="tab-btn"
@@ -274,17 +237,6 @@ import { getSimulationHistory } from '../api/simulation'
 const router = useRouter()
 const appVersion = __APP_VERSION__
 
-// ============ Resume previous session ============
-//
-// Fetches the history on mount, filters to partials (anything not
-// completed/failed), and renders a compact banner above HistoryDatabase
-// so returning users can pick up where they left off without hunting
-// through the full carousel.
-//
-// The classifier mirrors HistoryDatabase.getLifecycleStage — kept inline
-// here rather than extracted to a util because the duplication is ~15
-// lines and both views need to own the semantic independently for now.
-const resumableSessions = ref([])
 const historyRef = ref(null)
 const historyCount = ref(0)
 
@@ -306,87 +258,16 @@ const setTab = (t) => {
   try { localStorage.setItem(TAB_KEY, t) } catch { /* ignore */ }
 }
 
-const getResumeStage = (sim) => {
-  if (!sim) return 'unknown'
-  const s = (sim.status || '').toLowerCase()
-  const rs = (sim.runner_status || '').toLowerCase()
-  if (s === 'stopped' || rs === 'stopped' || rs === 'cancelled') return 'stopped'
-  if (s === 'running' || rs === 'running') return 'running'
-  if (s === 'ready') return 'ready'
-  if (s === 'preparing') return 'preparing'
-  if (s === 'created') return 'created'
-  return s || 'unknown'
-}
-const isResumable = (sim) => {
-  const stage = getResumeStage(sim)
-  // Skip completed/failed — those aren't "unfinished".
-  return ['created', 'preparing', 'ready', 'running', 'stopped'].includes(stage)
-}
-
-const getResumeTarget = (sim) => {
-  if (!sim) return '—'
-  if (sim.report_id) return 'Report'
-  if (sim.simulation_id) return 'Step 2 · Environment'
-  if (sim.project_id) return 'Step 1 · Graph build'
-  return '—'
-}
-
-const resumeSession = (sim) => {
-  if (!sim) return
-  if (sim.report_id) {
-    router.push({ name: 'Report', params: { reportId: sim.report_id } })
-  } else if (sim.simulation_id) {
-    router.push({ name: 'Simulation', params: { simulationId: sim.simulation_id } })
-  } else if (sim.project_id) {
-    router.push({ name: 'Process', params: { projectId: sim.project_id } })
-  }
-}
-
-const formatSimId = (id) => {
-  if (!id) return ''
-  return id.replace(/^sim_/, '').slice(0, 10)
-}
-
-const truncate = (text, n) => {
-  if (!text) return ''
-  if (text.length <= n) return text
-  return text.slice(0, n) + '…'
-}
-
-const formatRelative = (iso) => {
-  if (!iso) return 'unknown'
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return 'unknown'
-  const diff = Date.now() - t
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins} min ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d ago`
-  return new Date(iso).toLocaleDateString()
-}
-
-
-const loadResumableSessions = async () => {
+// History count for the tab badge — reads from the same endpoint
+// HistoryDatabase uses, but we only need the length.
+const loadHistoryCount = async () => {
   try {
     const res = await getSimulationHistory(50)
     if (res?.success && Array.isArray(res.data)) {
       historyCount.value = res.data.length
-      // Sort by updated_at desc so the most recently touched partial is first
-      const partials = res.data
-        .filter(isResumable)
-        .sort((a, b) => {
-          const ta = new Date(a.updated_at || a.created_at || 0).getTime()
-          const tb = new Date(b.updated_at || b.created_at || 0).getTime()
-          return tb - ta
-        })
-      resumableSessions.value = partials
     }
   } catch (err) {
-    // Non-fatal — if history fetch fails the section stays hidden
-    console.warn('Resume section: history fetch failed', err)
+    console.warn('History count fetch failed', err)
   }
 }
 
@@ -421,10 +302,9 @@ onMounted(async () => {
   } catch (e) {
     researchAvailable.value = false
   }
-  // Populate the "Resume previous session" banner. Non-blocking — the
-  // section is v-if gated on resumableSessions.length > 0 so a failure
-  // simply leaves it hidden.
-  loadResumableSessions()
+  // Populate the history-count badge on the Previous sessions tab.
+  // Non-blocking — failure just leaves the badge at 0.
+  loadHistoryCount()
 })
 
 const setInputMode = (mode) => {
@@ -776,54 +656,66 @@ const startEntry = () => {
    room while the workflow legend remains visible as a sidebar.
    ============================================================ */
 
-/* Tab bar */
+/* Tab bar — GitHub-style underline tabs.
+   The bar itself has a 1px bottom rule; each tab is a borderless
+   button that gains a thick coloured underline when active, visually
+   "anchoring" it to the content area below. */
 .tab-bar {
   display: flex;
-  gap: 8px;
-  border-top: 1px solid var(--border);
+  gap: 0;
   border-bottom: 1px solid var(--border);
-  padding: 12px 0;
-  margin-top: 40px;
+  margin-top: 48px;
+  padding: 0;
+  position: relative;
 }
 .tab-btn {
   background: transparent;
-  border: 1px solid var(--border);
-  padding: 10px 22px;
+  border: none;
+  padding: 16px 24px 14px;
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   letter-spacing: 0.04em;
   color: var(--gray-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  gap: 10px;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;  /* overlap the bar's 1px border */
+  transition: color 0.15s, border-color 0.15s;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 .tab-btn:hover {
   color: var(--black);
-  border-color: var(--black);
+  border-bottom-color: var(--border);
 }
 .tab-btn.active {
   color: var(--black);
-  border-color: var(--black);
-  background: var(--black);
-  color: #ffffff;
+  border-bottom-color: var(--orange, #FF4500);
+  font-weight: 700;
 }
 .tab-glyph {
-  font-size: 1rem;
+  font-size: 1.05rem;
   line-height: 1;
+  opacity: 0.7;
+}
+.tab-btn.active .tab-glyph {
+  opacity: 1;
+  color: var(--orange, #FF4500);
 }
 .tab-count {
-  background: rgba(255,255,255,0.18);
-  color: inherit;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-.tab-btn:not(.active) .tab-count {
   background: var(--border);
   color: var(--gray-text);
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tab-btn.active .tab-count {
+  background: var(--orange, #FF4500);
+  color: #ffffff;
 }
 
 /* New project tab: 15% rail + 85% console */
@@ -911,14 +803,6 @@ const startEntry = () => {
 /* History tab wrapper — the existing HistoryDatabase styles handle internals */
 .history-tab {
   padding-top: 32px;
-}
-
-/* Resume section — rendered above the tab bar */
-.resume-section--top {
-  margin-top: 40px;
-  padding: 18px 20px;
-  border: 1px solid var(--border);
-  background: rgba(255, 165, 0, 0.04);
 }
 
 /* Narrow viewports: collapse rail to a horizontal strip above the console */
@@ -1277,138 +1161,6 @@ const startEntry = () => {
   }
 }
 
-/* ============ Resume previous session banner ============ */
-
-.resume-section {
-  margin: 48px auto 24px;
-  max-width: 1180px;
-  padding: 22px 28px;
-  background: #ffffff;
-  border: 1px solid #eeeeee;
-  border-left: 4px solid #FF5722;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.resume-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.resume-diamond {
-  color: #FF5722;
-  font-size: 1.1rem;
-}
-.resume-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin: 0;
-  letter-spacing: 0.02em;
-}
-.resume-count {
-  margin-left: auto;
-  font-size: 0.8rem;
-  color: #666;
-  font-variant-numeric: tabular-nums;
-  background: #f5f5f5;
-  padding: 3px 10px;
-  border-radius: 999px;
-}
-
-.resume-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-
-.resume-card {
-  text-align: left;
-  background: #fafafa;
-  border: 1px solid #eeeeee;
-  border-radius: 7px;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-family: inherit;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 100px;
-}
-.resume-card:hover {
-  background: #ffffff;
-  border-color: #FF5722;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 87, 34, 0.12);
-}
-
-.resume-card-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.resume-stage-pill {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-.pill-created     { background: #f0f0f0; color: #666; }
-.pill-preparing   { background: #fff3e0; color: #b25a00; }
-.pill-ready       { background: #e1f5fe; color: #0277bd; }
-.pill-running     { background: #fff8e1; color: #8a6100; }
-.pill-stopped     { background: #f3e5f5; color: #7b1fa2; }
-.pill-unknown     { background: #eeeeee; color: #aaa; }
-
-.resume-card-id {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
-  color: #888;
-}
-
-.resume-card-title {
-  font-size: 0.88rem;
-  color: #1a1a1a;
-  line-height: 1.35;
-  font-weight: 500;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.resume-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  color: #888;
-  margin-top: auto;
-}
-.resume-arrow {
-  margin-left: auto;
-  color: #FF5722;
-  font-weight: 600;
-}
-
-.resume-more {
-  background: none;
-  border: none;
-  color: #FF5722;
-  font-weight: 600;
-  font-size: 0.82rem;
-  cursor: pointer;
-  margin-top: 12px;
-  padding: 6px 0;
-}
-.resume-more:hover {
-  text-decoration: underline;
-}
 </style>
 
 <style>
