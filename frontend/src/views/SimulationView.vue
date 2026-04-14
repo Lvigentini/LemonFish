@@ -2,9 +2,7 @@
   <div class="main-view">
     <!-- Header -->
     <header class="app-header">
-      <div class="header-left">
-        <div class="brand" @click="router.push('/')">MIROFISH <span style="font-weight:500;font-size:0.72em;color:#DAA520;letter-spacing:0.5px;">[LEMONFISH]</span></div>
-      </div>
+      <div class="header-left"><!-- brand provided by global AppHeader --></div>
       
       <div class="header-center">
         <div class="view-switcher">

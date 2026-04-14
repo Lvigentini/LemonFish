@@ -1,18 +1,6 @@
 <template>
   <div class="home-container">
-    <!-- top navigation bar -->
-    <nav class="navbar">
-      <div class="nav-brand">MIROFISH <span class="brand-suffix">[LEMONFISH]</span> <span class="version-pill">v{{ appVersion }}</span></div>
-      <div class="nav-links">
-        <LanguageSwitcher />
-        <router-link to="/settings/llm" class="github-link">
-          {{ $t('nav.llmSettings') }}
-        </router-link>
-        <a href="https://github.com/Lvigentini/LemonFish" target="_blank" class="github-link">
-          {{ $t('nav.visitGithub') }} <span class="arrow">↗</span>
-        </a>
-      </div>
-    </nav>
+    <!-- top navigation bar (now provided by global AppHeader) -->
 
     <div class="main-content">
       <!-- 上半部分：Hero 区域 -->

@@ -2,9 +2,7 @@
   <div class="main-view">
     <!-- Header -->
     <header class="app-header">
-      <div class="header-left">
-        <div class="brand" @click="router.push('/')">MIROFISH <span class="brand-suffix">[LEMONFISH]</span> <span class="version-pill">v{{ appVersion }}</span></div>
-      </div>
+      <div class="header-left"><!-- brand provided by global AppHeader --></div>
       
       <div class="header-center">
         <div class="view-switcher">

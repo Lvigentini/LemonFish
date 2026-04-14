@@ -1,10 +1,7 @@
 <template>
   <div class="step0-container">
     <nav class="navbar">
-      <router-link to="/" class="nav-brand">MIROFISH <span style="font-weight:500;font-size:0.72em;color:#DAA520;letter-spacing:0.5px;">[LEMONFISH]</span></router-link>
-      <div class="nav-links">
-        <span class="step-pill">STEP 0 — RESEARCH</span>
-      </div>
+      <span class="step-pill">STEP 0 — RESEARCH</span>
     </nav>
 
     <div class="main">

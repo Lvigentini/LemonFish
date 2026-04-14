@@ -1,10 +1,7 @@
 <template>
   <div class="llm-settings">
     <nav class="navbar">
-      <div class="nav-brand">
-        <router-link to="/" class="back-link">← {{ $t('llmSettings.back') }}</router-link>
-        <span class="title">{{ $t('llmSettings.title') }}</span>
-      </div>
+      <span class="title">{{ $t('llmSettings.title') }}</span>
     </nav>
 
     <div class="content">
