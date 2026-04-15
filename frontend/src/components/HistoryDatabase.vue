@@ -10,29 +10,6 @@
       <div class="gradient-overlay"></div>
     </div>
 
-    <!-- View toggle: card | list -->
-    <div class="view-toggle-row" v-if="projects.length > 0">
-      <span class="toggle-label">{{ $t('history.viewLabel') }}</span>
-      <div class="view-toggle">
-        <button
-          class="vt-btn"
-          :class="{ active: viewMode === 'card' }"
-          @click="setViewMode('card')"
-          :title="$t('history.viewCard')"
-        >
-          <span class="vt-icon">▦</span> {{ $t('history.viewCard') }}
-        </button>
-        <button
-          class="vt-btn"
-          :class="{ active: viewMode === 'list' }"
-          @click="setViewMode('list')"
-          :title="$t('history.viewList')"
-        >
-          <span class="vt-icon">≡</span> {{ $t('history.viewList') }}
-        </button>
-      </div>
-    </div>
-
     <!-- List view -->
     <div v-if="projects.length > 0 && viewMode === 'list'" class="list-container">
       <div class="list-header">
@@ -282,21 +259,11 @@ const route = useRoute()
 const { t } = useI18n()
 
 // status
-// View mode for previous-sessions list. Persisted to localStorage so the
-// user's last choice survives reloads.
-const VIEW_KEY = 'history-view-mode'
-const validViews = ['card', 'list']
-const viewMode = ref((() => {
-  try {
-    const saved = localStorage.getItem(VIEW_KEY)
-    return validViews.includes(saved) ? saved : 'card'
-  } catch { return 'card' }
-})())
-const setViewMode = (m) => {
-  if (!validViews.includes(m)) return
-  viewMode.value = m
-  try { localStorage.setItem(VIEW_KEY, m) } catch { /* ignore */ }
-}
+// viewMode is owned by the parent (Home) so the toggle can live in the
+// global tab bar. Defaults to 'card' if not provided.
+const props = defineProps({
+  viewMode: { type: String, default: 'card' }
+})
 
 const projects = ref([])
 const loading = ref(true)
@@ -1598,46 +1565,6 @@ onUnmounted(() => {
   text-align: center;
   line-height: 1.5;
 }
-
-/* ============ View toggle (card | list) ============ */
-.view-toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 18px;
-  padding: 0 4px;
-}
-.toggle-label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
-  color: #9CA3AF;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.view-toggle {
-  display: inline-flex;
-  border: 1px solid #d4d4d4;
-  border-radius: 6px;
-  overflow: hidden;
-}
-.vt-btn {
-  background: #ffffff;
-  border: none;
-  padding: 6px 14px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.78rem;
-  color: #666;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-right: 1px solid #d4d4d4;
-  transition: background 0.15s, color 0.15s;
-}
-.vt-btn:last-child { border-right: none; }
-.vt-btn:hover { background: #f5f5f5; color: #1a1a1a; }
-.vt-btn.active { background: #1a1a1a; color: #ffffff; }
-.vt-icon { font-size: 0.95rem; line-height: 1; }
 
 /* ============ List view ============ */
 .list-container {

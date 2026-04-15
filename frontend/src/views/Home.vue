@@ -45,7 +45,10 @@
       </section>
 
       <!-- 下半部分：双栏布局 -->
-      <!-- Tab bar: New project | Previous sessions -->
+      <!-- Tab bar: New project | Previous sessions
+           Right side carries the card/list view toggle, but only while
+           the Previous sessions tab is active. Keeps controls in one
+           horizontal row so the table area stays uncluttered. -->
       <nav class="tab-bar" role="tablist">
         <button
           class="tab-btn"
@@ -66,6 +69,28 @@
           <span class="tab-glyph">◇</span> {{ $t('home.tabHistory') }}
           <span v-if="historyCount > 0" class="tab-count">{{ historyCount }}</span>
         </button>
+
+        <div v-if="activeTab === 'history'" class="tab-bar-actions">
+          <span class="toggle-label">{{ $t('history.viewLabel') }}</span>
+          <div class="view-toggle">
+            <button
+              class="vt-btn"
+              :class="{ active: historyView === 'card' }"
+              @click="setHistoryView('card')"
+              :title="$t('history.viewCard')"
+            >
+              <span class="vt-icon">▦</span> {{ $t('history.viewCard') }}
+            </button>
+            <button
+              class="vt-btn"
+              :class="{ active: historyView === 'list' }"
+              @click="setHistoryView('list')"
+              :title="$t('history.viewList')"
+            >
+              <span class="vt-icon">≡</span> {{ $t('history.viewList') }}
+            </button>
+          </div>
+        </div>
       </nav>
 
       <!-- New project tab -->
@@ -218,9 +243,9 @@
         </div>
       </section>
 
-      <!-- History tab -->
+      <!-- Previous sessions tab -->
       <section v-show="activeTab === 'history'" class="history-tab">
-        <HistoryDatabase ref="historyRef" />
+        <HistoryDatabase ref="historyRef" :viewMode="historyView" />
       </section>
     </div>
   </div>
@@ -256,6 +281,22 @@ const setTab = (t) => {
   if (!validTabs.includes(t)) return
   activeTab.value = t
   try { localStorage.setItem(TAB_KEY, t) } catch { /* ignore */ }
+}
+
+// History card/list view — owned by Home so the toggle can live in the
+// tab bar. HistoryDatabase reads it via prop.
+const HISTORY_VIEW_KEY = 'history-view-mode'
+const validHistoryViews = ['card', 'list']
+const historyView = ref((() => {
+  try {
+    const saved = localStorage.getItem(HISTORY_VIEW_KEY)
+    return validHistoryViews.includes(saved) ? saved : 'card'
+  } catch { return 'card' }
+})())
+const setHistoryView = (m) => {
+  if (!validHistoryViews.includes(m)) return
+  historyView.value = m
+  try { localStorage.setItem(HISTORY_VIEW_KEY, m) } catch { /* ignore */ }
 }
 
 // History count for the tab badge — reads from the same endpoint
@@ -717,6 +758,49 @@ const startEntry = () => {
   background: var(--orange, #FF4500);
   color: #ffffff;
 }
+
+/* Right-aligned actions group inside the tab bar */
+.tab-bar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 6px;  /* visual align with tab labels */
+}
+.tab-bar-actions .toggle-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--gray-text);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tab-bar-actions .view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.tab-bar-actions .vt-btn {
+  background: transparent;
+  border: none;
+  padding: 5px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--gray-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-right: 1px solid var(--border);
+  transition: background 0.15s, color 0.15s;
+}
+.tab-bar-actions .vt-btn:last-child { border-right: none; }
+.tab-bar-actions .vt-btn:hover { background: #f5f5f5; color: var(--black); }
+.tab-bar-actions .vt-btn.active {
+  background: var(--black);
+  color: #ffffff;
+}
+.tab-bar-actions .vt-icon { font-size: 0.9rem; line-height: 1; }
 
 /* New project tab: 15% rail + 85% console */
 .dashboard-section {
